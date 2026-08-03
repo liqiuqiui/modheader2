@@ -6,7 +6,12 @@
     "dev": "wxt --port 3003",
     "build": "wxt build",
     "pack": "wxt zip",
-    "compile": "tsc --noEmit"
+    "compile": "tsc --noEmit",
+    "prepare": "lefthook install",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.4",
@@ -33,6 +38,9 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@wxt-dev/module-react": "^1.1.0",
+    "lefthook": "^2.1.10",
+    "oxfmt": "^0.61.0",
+    "oxlint": "^1.76.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "wxt": "^0.20.0"

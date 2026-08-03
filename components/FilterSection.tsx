@@ -70,7 +70,12 @@ export function UrlFilterSection({ title, filters, onChange }: UrlFilterListProp
         </p>
       ) : (
         filters.map((f, i) => (
-          <UrlFilterRow key={f.id} filter={f} onChange={(p) => update(i, p)} onDelete={() => remove(i)} />
+          <UrlFilterRow
+            key={f.id}
+            filter={f}
+            onChange={(p) => update(i, p)}
+            onDelete={() => remove(i)}
+          />
         ))
       )}
     </div>

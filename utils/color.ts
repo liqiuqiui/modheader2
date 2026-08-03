@@ -9,7 +9,9 @@ function hslComponent(p: number, q: number, t: number): number {
 }
 
 function toHex(c: number): string {
-  return Math.round(c * 255).toString(16).padStart(2, "0");
+  return Math.round(c * 255)
+    .toString(16)
+    .padStart(2, "0");
 }
 
 function hslToHex(h: number, s: number, l: number): string {

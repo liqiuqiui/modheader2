@@ -13,9 +13,7 @@ import {
   FileDown,
   FileUp,
   Filter,
-  Globe2,
   GripVertical,
-  HelpCircle,
   Languages,
   Maximize2,
   MessageSquare,
@@ -323,7 +321,8 @@ function HeaderSection({
     );
   }, [rules, searchQuery]);
 
-  const enabled = rules.length > 0 && rules.some((rule) => rule.enabled);
+  const enabled = rules.some((rule) => rule.enabled);
+
   return (
     <section>
       <SectionHeader
@@ -394,7 +393,7 @@ function CookieSection({
     (cookie) =>
       !query || `${cookie.name} ${cookie.value} ${cookie.comment}`.toLowerCase().includes(query),
   );
-  const enabled = cookies.length > 0 && cookies.some((cookie) => cookie.enabled);
+  const enabled = cookies.some((cookie) => cookie.enabled);
 
   return (
     <section>
@@ -747,7 +746,7 @@ function FilterSection({
         .includes(query)
     );
   });
-  const enabled = filters.length > 0 && filters.some((filter) => filter.enabled);
+  const enabled = filters.some((filter) => filter.enabled);
   const activeTab = tabs.find((tab) => tab.active);
 
   const withoutFilter = (id: string) => ({
@@ -1178,7 +1177,7 @@ function RedirectSection({
   const visible = replacements.filter(
     (item) => !query || `${item.name} ${item.value} ${item.comment}`.toLowerCase().includes(query),
   );
-  const enabled = replacements.length > 0 && replacements.some((item) => item.enabled);
+  const enabled = replacements.some((item) => item.enabled);
   return (
     <section>
       <SectionHeader
@@ -1270,7 +1269,6 @@ function Sidebar({
   onCollapsedChange,
   onSearchChange,
   onSelect,
-  onAdd,
   onImport,
   onSort,
 }: {
