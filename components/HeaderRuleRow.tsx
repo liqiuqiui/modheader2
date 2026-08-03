@@ -50,7 +50,7 @@ export function HeaderRuleRow({ rule, onChange, onDelete, onClone, onConvert, co
         />
         <Input
           aria-label={t("header.name")}
-          className={`${compact ? "h-8" : "h-9"} min-w-0 flex-[0.85] border-slate-200 bg-slate-50 font-mono text-xs font-semibold shadow-none focus-visible:bg-white`}
+          className={`${compact ? "h-8" : "h-9"} min-w-0 flex-[0.85] border-slate-200 bg-slate-50 font-mono text-xs shadow-none focus-visible:bg-white`}
           placeholder={t("header.namePlaceholder")}
           value={rule.name}
           autoFocus={autoFocus && !rule.name}

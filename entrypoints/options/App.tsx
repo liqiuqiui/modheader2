@@ -66,6 +66,7 @@ import { HeaderRuleRow } from "../../components/HeaderRuleRow";
 import { Switch } from "../../components/ui/switch";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { TabPicker, type BrowserTab } from "../../components/TabPicker";
+import { ThemePortalProvider } from "../../components/ThemePortalProvider";
 import { useTranslation } from "react-i18next";
 import type { ParseKeys } from "i18next";
 
@@ -1151,10 +1152,11 @@ export default function App({ mode = "options" }: { mode?: "options" | "popup" }
   if (!profile) return <div className="flex h-screen items-center justify-center bg-slate-50 text-sm text-slate-400">{t("profile.none")}</div>;
 
   return (
-    <div
-      className={`flex overflow-hidden bg-slate-100 text-slate-800 ${mode === "popup" ? "h-[580px] w-[780px]" : "h-screen w-full"}`}
-      style={{ "--theme-color": profile.backgroundColor } as React.CSSProperties}
-    >
+    <ThemePortalProvider themeColor={profile.backgroundColor}>
+      <div
+        className={`flex overflow-hidden bg-slate-100 text-slate-800 ${mode === "popup" ? "h-[580px] w-[780px]" : "h-screen w-full"}`}
+        style={{ "--theme-color": profile.backgroundColor } as React.CSSProperties}
+      >
       <Sidebar
         mode={mode}
         collapsed={collapsed}
@@ -1309,6 +1311,7 @@ export default function App({ mode = "options" }: { mode?: "options" | "popup" }
       <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => void importProfiles(event.target.files?.[0])} />
       <input ref={colorInputRef} type="color" value={profile.backgroundColor} className="sr-only" onChange={(event) => void handleUpdateProfile({ backgroundColor: event.target.value, textColor: "white" })} />
       {notice && <div role="status" aria-live="polite" className="fixed bottom-5 right-5 z-[200] rounded-xl bg-slate-900 px-4 py-3 text-xs font-medium text-white shadow-xl">{notice}</div>}
-    </div>
+      </div>
+    </ThemePortalProvider>
   );
 }

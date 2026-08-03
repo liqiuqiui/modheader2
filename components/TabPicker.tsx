@@ -3,6 +3,7 @@ import { Popover } from "radix-ui";
 import type { Browser } from "wxt/browser";
 import { Check, ChevronDown, Globe2, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useThemePortalContainer } from "./ThemePortalProvider";
 
 export type BrowserTab = Browser.tabs.Tab;
 
@@ -49,6 +50,7 @@ export function TabPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const portalContainer = useThemePortalContainer();
   const numericValue = Number(value);
   const selected = tabs.find((tab) => tab.id === numericValue);
 
@@ -88,7 +90,7 @@ export function TabPicker({
         </Popover.Trigger>
       </div>
 
-      <Popover.Portal>
+      <Popover.Portal container={portalContainer ?? undefined}>
         <Popover.Content
           align="start"
           side="bottom"
