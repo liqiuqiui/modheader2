@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Popover } from "radix-ui";
 import { clsx } from "clsx";
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { Check, ChevronDown, RefreshCw, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useThemePortalContainer } from "./ThemePortalProvider";
 import type { BrowserTab } from "../types/browser";
@@ -19,11 +19,13 @@ function getHost(url?: string) {
 export function TabPicker({
   value,
   tabs,
+  currentTabId,
   onChange,
   compact = false,
 }: {
   value: number | string;
   tabs: BrowserTab[];
+  currentTabId?: number;
   onChange: (tabId: number | string) => void;
   compact?: boolean;
 }) {
@@ -34,6 +36,9 @@ export function TabPicker({
   const portalContainer = useThemePortalContainer();
   const numericValue = Number(value);
   const selected = tabs.find((tab) => tab.id === numericValue);
+  const currentTab = tabs.find((tab) => tab.id === currentTabId);
+  const isClosedTab = value !== "" && !selected;
+  const canUseCurrentTab = isClosedTab && currentTab?.id !== undefined;
 
   const filteredTabs = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -55,27 +60,42 @@ export function TabPicker({
         if (!nextOpen) setQuery("");
       }}
     >
-      <div className="relative min-w-0 flex-1">
-        <Popover.Trigger asChild>
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              className={clsx(
+                "flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white text-left text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:border-[var(--theme-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] data-[state=open]:border-[var(--theme-color)]",
+                compact ? "h-8 px-2 text-xs" : "h-9 px-3 text-sm",
+              )}
+              aria-haspopup="listbox"
+            >
+              <TabIcon tab={selected} className={clsx(compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+              <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+              {host && !compact && (
+                <span className="max-w-36 truncate text-xs text-slate-400">{host}</span>
+              )}
+              <ChevronDown
+                aria-hidden="true"
+                className={clsx("h-4 w-4 shrink-0 text-slate-400 transition", open && "rotate-180")}
+              />
+            </button>
+          </Popover.Trigger>
+        </div>
+        {canUseCurrentTab && (
           <button
             type="button"
+            onClick={() => onChange(currentTab.id!)}
             className={clsx(
-              "flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white text-left text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:border-[var(--theme-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] data-[state=open]:border-[var(--theme-color)]",
+              "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[color-mix(in_srgb,var(--theme-color)_30%,white)] bg-[color-mix(in_srgb,var(--theme-color)_8%,white)] font-medium text-[var(--theme-color)] transition hover:bg-[color-mix(in_srgb,var(--theme-color)_14%,white)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)]",
               compact ? "h-8 px-2 text-xs" : "h-9 px-3 text-sm",
             )}
-            aria-haspopup="listbox"
           >
-            <TabIcon tab={selected} className={clsx(compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-            <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
-            {host && !compact && (
-              <span className="max-w-36 truncate text-xs text-slate-400">{host}</span>
-            )}
-            <ChevronDown
-              aria-hidden="true"
-              className={clsx("h-4 w-4 shrink-0 text-slate-400 transition", open && "rotate-180")}
-            />
+            <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
+            {t("tab.useCurrent")}
           </button>
-        </Popover.Trigger>
+        )}
       </div>
 
       <Popover.Portal container={portalContainer ?? undefined}>
@@ -124,6 +144,7 @@ export function TabPicker({
             ) : (
               filteredTabs.map((tab) => {
                 const isSelected = tab.id === numericValue;
+                const isCurrent = tab.id === currentTabId;
                 return (
                   <button
                     type="button"
@@ -157,9 +178,14 @@ export function TabPicker({
                         {getHost(tab.url) || tab.url}
                       </span>
                     </span>
-                    {tab.active && (
-                      <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
+                    {isCurrent && (
+                      <span className="rounded-full border border-[color-mix(in_srgb,var(--theme-color)_30%,white)] bg-[color-mix(in_srgb,var(--theme-color)_10%,white)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--theme-color)]">
                         {t("common.current")}
+                      </span>
+                    )}
+                    {!isCurrent && tab.active && (
+                      <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
+                        {t("tab.active")}
                       </span>
                     )}
                     {isSelected && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}

@@ -35,7 +35,7 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
   const [collapsed, setCollapsed] = useState(mode === "popup");
   const [searchQuery, setSearchQuery] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
-  const tabs = useBrowserTabs();
+  const { tabs, currentTabId } = useBrowserTabs();
   const [history, setHistory] = useState<{ past: HistorySnapshot[]; future: HistorySnapshot[] }>({
     past: [],
     future: [],
@@ -350,6 +350,7 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
                 mode={mode}
                 profile={profile}
                 tabs={tabs}
+                currentTabId={currentTabId}
                 searchQuery={searchQuery}
                 focusHeaderId={focusHeaderId}
                 focusCookieId={focusCookieId}

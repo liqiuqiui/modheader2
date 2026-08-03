@@ -35,6 +35,7 @@ export function addFilter(
   tabs: BrowserTab[],
   kind: FilterKind,
   mode: FilterMode,
+  currentTabId?: number,
 ): { patch: Partial<Profile>; focusId?: string } {
   if (kind === "urlPattern" || kind === "urlRegex") {
     const filter = createUrlFilter({ matchType: kind === "urlRegex" ? "regex" : "pattern" });
@@ -47,7 +48,8 @@ export function addFilter(
     };
   }
 
-  const activeTabId = tabs.find((tab) => tab.active)?.id ?? "";
+  const activeTabId =
+    tabs.find((tab) => tab.id === currentTabId)?.id ?? tabs.find((tab) => tab.active)?.id ?? "";
   if (kind === "tab") {
     return {
       patch: {
@@ -175,6 +177,7 @@ export function changeFilterKind(
   tabs: BrowserTab[],
   filter: FilterView,
   kind: FilterKind,
+  currentTabId?: number,
 ): Partial<Profile> {
   if (kind === filter.kind) return {};
   const collections = withoutFilter(profile, filter.id);
@@ -191,7 +194,10 @@ export function changeFilterKind(
     collections.tabFilters.push(
       createTabFilter({
         ...common,
-        tabId: tabs.find((tab) => tab.active)?.id ?? "",
+        tabId:
+          tabs.find((tab) => tab.id === currentTabId)?.id ??
+          tabs.find((tab) => tab.active)?.id ??
+          "",
         exclude: filter.mode === "exclude",
       }),
     );

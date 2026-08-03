@@ -12,6 +12,7 @@ export function EditorSections({
   mode,
   profile,
   tabs,
+  currentTabId,
   searchQuery,
   focusHeaderId,
   focusCookieId,
@@ -22,6 +23,7 @@ export function EditorSections({
   mode: EditorMode;
   profile: Profile;
   tabs: BrowserTab[];
+  currentTabId?: number;
   searchQuery: string;
   focusHeaderId?: string | null;
   focusCookieId?: string | null;
@@ -73,6 +75,7 @@ export function EditorSections({
       <FilterSection
         profile={profile}
         tabs={tabs}
+        currentTabId={currentTabId}
         searchQuery={searchQuery}
         focusFilterId={focusFilterId}
         onUpdate={onUpdate}

@@ -153,6 +153,8 @@
   "tab": {
     "select": "Select a browser tab",
     "closed": "Closed tab #{{id}}",
+    "active": "Active",
+    "useCurrent": "Use current",
     "search": "Search tab title or URL",
     "clearSearch": "Clear search",
     "noResults": "No matching tabs",

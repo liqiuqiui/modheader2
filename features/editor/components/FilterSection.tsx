@@ -22,6 +22,7 @@ import { SectionHeader } from "./SectionHeader";
 export function FilterSection({
   profile,
   tabs,
+  currentTabId,
   searchQuery,
   onUpdate,
   focusFilterId,
@@ -29,6 +30,7 @@ export function FilterSection({
 }: {
   profile: Profile;
   tabs: BrowserTab[];
+  currentTabId?: number;
   searchQuery: string;
   onUpdate: (patch: Partial<Profile>) => void;
   focusFilterId?: string | null;
@@ -51,10 +53,10 @@ export function FilterSection({
     );
   }, [filters, searchQuery, t]);
   const enabled = filters.some((filter) => filter.enabled);
-  const activeTab = tabs.find((tab) => tab.active);
+  const currentTab = tabs.find((tab) => tab.id === currentTabId) ?? tabs.find((tab) => tab.active);
 
   const handleAdd = (kind: FilterKind, mode: FilterMode = "include") => {
-    const result = addFilter(profile, tabs, kind, mode);
+    const result = addFilter(profile, tabs, kind, mode, currentTabId);
     if (result.focusId) setLocalFocusFilterId(result.focusId);
     onUpdate(result.patch);
     setOpen(true);
@@ -103,7 +105,7 @@ export function FilterSection({
             <FilterAddPanel
               draftKind={draftKind}
               draftMode={draftMode}
-              activeTab={activeTab}
+              activeTab={currentTab}
               onKindChange={setDraftKind}
               onModeChange={setDraftMode}
               onAdd={() => handleAdd(draftKind, draftMode)}
@@ -116,8 +118,11 @@ export function FilterSection({
               filter={filter}
               autoFocusValue={filter.id === focusFilterId || filter.id === localFocusFilterId}
               tabs={tabs}
+              currentTabId={currentTabId}
               onPatch={(patch) => onUpdate(updateFilter(profile, filter, patch))}
-              onKindChange={(kind) => onUpdate(changeFilterKind(profile, tabs, filter, kind))}
+              onKindChange={(kind) =>
+                onUpdate(changeFilterKind(profile, tabs, filter, kind, currentTabId))
+              }
               onDelete={() => onUpdate(withoutFilter(profile, filter.id))}
               compact={compact}
             />

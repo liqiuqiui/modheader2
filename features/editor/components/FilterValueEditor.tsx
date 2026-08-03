@@ -9,17 +9,21 @@ import { FilterSelect } from "./FilterSelect";
 export function FilterValueEditor({
   filter,
   tabs,
+  currentTabId,
   onChange,
   autoFocus,
 }: {
   filter: FilterView;
   tabs: BrowserTab[];
+  currentTabId?: number;
   onChange: (value: string | number) => void;
   autoFocus?: boolean;
 }) {
   const { t } = useTranslation();
   if (filter.kind === "tab") {
-    return <TabPicker value={filter.value} tabs={tabs} onChange={onChange} />;
+    return (
+      <TabPicker value={filter.value} tabs={tabs} currentTabId={currentTabId} onChange={onChange} />
+    );
   }
   if (filter.kind === "resourceType") {
     return (

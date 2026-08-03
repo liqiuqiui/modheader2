@@ -11,6 +11,7 @@ import { FilterValueEditor } from "./FilterValueEditor";
 export function FilterRow({
   filter,
   tabs,
+  currentTabId,
   onPatch,
   onKindChange,
   onDelete,
@@ -19,6 +20,7 @@ export function FilterRow({
 }: {
   filter: FilterView;
   tabs: BrowserTab[];
+  currentTabId?: number;
   onPatch: (patch: Partial<FilterView>) => void;
   onKindChange: (kind: FilterKind) => void;
   onDelete: () => void;
@@ -69,6 +71,7 @@ export function FilterRow({
         <FilterValueEditor
           filter={filter}
           tabs={tabs}
+          currentTabId={currentTabId}
           autoFocus={autoFocusValue}
           onChange={(value) => onPatch({ value })}
         />

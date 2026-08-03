@@ -153,6 +153,8 @@
   "tab": {
     "select": "选择浏览器 Tab",
     "closed": "已关闭的 Tab #{{id}}",
+    "active": "活跃",
+    "useCurrent": "使用当前Tab",
     "search": "搜索 Tab 标题或网址",
     "clearSearch": "清空搜索",
     "noResults": "没有找到匹配的 Tab",
