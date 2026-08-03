@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "ModHeader V2"
+  },
+  "extensionDescription": {
+    "message": "Modify HTTP request headers, response headers, and URL redirects"
+  }
+}

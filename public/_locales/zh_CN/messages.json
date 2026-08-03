@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "ModHeader V2"
+  },
+  "extensionDescription": {
+    "message": "修改 HTTP 请求头、响应头和 URL 重定向"
+  }
+}
