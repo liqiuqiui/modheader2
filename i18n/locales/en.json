@@ -127,6 +127,7 @@
     "typeLabel": "Filter type",
     "enable": "Enable filter",
     "delete": "Delete filter",
+    "reorder": "Drag to reorder filter",
     "initiatorPlaceholder": "example.com",
     "regexPlaceholder": "https://api\\.example\\.com/.*",
     "patternPlaceholder": "*://api.example.com/*",

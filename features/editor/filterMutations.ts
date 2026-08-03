@@ -5,6 +5,7 @@ import {
   createTabFilter,
   createUrlFilter,
 } from "../../types";
+import { arrayMoveImmutable } from "array-move";
 import type { Profile, RequestMethod } from "../../types";
 import type { BrowserTab } from "../../types/browser";
 import type { FilterKind, FilterMode, FilterView } from "./types";
@@ -17,6 +18,7 @@ export type FilterCollectionsPatch = Pick<
   | "resourceFilters"
   | "methodFilters"
   | "initiatorDomainFilters"
+  | "filterOrder"
 >;
 
 export function withoutFilter(profile: Profile, id: string): FilterCollectionsPatch {
@@ -27,6 +29,24 @@ export function withoutFilter(profile: Profile, id: string): FilterCollectionsPa
     resourceFilters: profile.resourceFilters.filter((filter) => filter.id !== id),
     methodFilters: profile.methodFilters.filter((filter) => filter.id !== id),
     initiatorDomainFilters: profile.initiatorDomainFilters.filter((filter) => filter.id !== id),
+    filterOrder: profile.filterOrder,
+  };
+}
+
+export function deleteFilter(profile: Profile, id: string): FilterCollectionsPatch {
+  return {
+    ...withoutFilter(profile, id),
+    filterOrder: profile.filterOrder.filter((filterId) => filterId !== id),
+  };
+}
+
+export function reorderFilters(
+  filters: FilterView[],
+  fromIndex: number,
+  toIndex: number,
+): Pick<Profile, "filterOrder"> {
+  return {
+    filterOrder: arrayMoveImmutable(filters, fromIndex, toIndex).map((filter) => filter.id),
   };
 }
 
@@ -228,6 +248,7 @@ export function setAllFiltersEnabled(profile: Profile, enabled: boolean): Filter
       ...filter,
       enabled,
     })),
+    filterOrder: profile.filterOrder,
   };
 }
 
@@ -239,5 +260,6 @@ export function clearFilters(): FilterCollectionsPatch {
     resourceFilters: [],
     methodFilters: [],
     initiatorDomainFilters: [],
+    filterOrder: [],
   };
 }

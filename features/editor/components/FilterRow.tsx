@@ -1,4 +1,5 @@
 import { clsx } from "clsx";
+import { useSortable } from "@dnd-kit/react/sortable";
 import { GripVertical, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../../../components/ui/switch";
@@ -16,6 +17,8 @@ export function FilterRow({
   onKindChange,
   onDelete,
   autoFocusValue,
+  sortableIndex,
+  sortableDisabled = false,
   compact = false,
 }: {
   filter: FilterView;
@@ -25,23 +28,37 @@ export function FilterRow({
   onKindChange: (kind: FilterKind) => void;
   onDelete: () => void;
   autoFocusValue?: boolean;
+  sortableIndex: number;
+  sortableDisabled?: boolean;
   compact?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const isEnglish = i18n.resolvedLanguage === "en";
+  const { ref, handleRef, isDragging } = useSortable({
+    id: filter.id,
+    index: sortableIndex,
+    disabled: sortableDisabled,
+  });
   return (
     <div
+      ref={ref}
       className={clsx(
         "group rounded-lg border bg-white transition",
         compact ? "p-1.5 shadow-sm" : "p-2.5 shadow-sm",
         filter.enabled ? "border-slate-200" : "border-slate-200/70 opacity-60",
+        isDragging && "opacity-45",
       )}
     >
       <div className="flex items-start gap-2">
-        <GripVertical
-          aria-hidden="true"
-          className="mt-2 hidden h-4 w-4 shrink-0 cursor-grab text-slate-300 sm:block"
-        />
+        <button
+          ref={handleRef}
+          type="button"
+          aria-label={t("filter.reorder")}
+          disabled={sortableDisabled}
+          className="mt-1.5 hidden shrink-0 cursor-grab rounded p-0.5 text-slate-300 transition hover:bg-slate-100 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] active:cursor-grabbing disabled:cursor-default disabled:opacity-40 sm:inline-flex"
+        >
+          <GripVertical aria-hidden="true" className="h-4 w-4" />
+        </button>
         <Switch
           checked={filter.enabled}
           onCheckedChange={(enabled) => onPatch({ enabled })}

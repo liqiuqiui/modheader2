@@ -127,6 +127,7 @@
     "typeLabel": "过滤器类型",
     "enable": "启用过滤条件",
     "delete": "删除过滤条件",
+    "reorder": "拖拽排序过滤条件",
     "initiatorPlaceholder": "example.com",
     "regexPlaceholder": "https://api\\.example\\.com/.*",
     "patternPlaceholder": "*://api.example.com/*",

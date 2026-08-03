@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { arrayMoveImmutable } from "array-move";
 import { clsx } from "clsx";
 import { browser } from "wxt/browser";
 import { useTranslation } from "react-i18next";
@@ -119,6 +120,20 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
   const handleSelect = async (index: number) => {
     await selectedIndexStorage.setValue(index);
     setState((current) => ({ ...current, selectedProfileIndex: index }));
+  };
+
+  const handleReorderProfiles = async (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    const selectedProfileId = state.profiles[state.selectedProfileIndex]?.id;
+    const profiles = arrayMoveImmutable(state.profiles, fromIndex, toIndex);
+
+    const selectedIndex = Math.max(
+      0,
+      profiles.findIndex((item) => item.id === selectedProfileId),
+    );
+    remember();
+    await saveProfiles(profiles, selectedIndex);
+    setState((current) => ({ ...current, profiles, selectedProfileIndex: selectedIndex }));
   };
 
   const handleAdd = async () => {
@@ -292,6 +307,7 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
           onCollapsedChange={handleCollapsedChange}
           onSearchChange={setSearchQuery}
           onSelect={(index) => void handleSelect(index)}
+          onReorder={(fromIndex, toIndex) => void handleReorderProfiles(fromIndex, toIndex)}
           onImport={() => fileInputRef.current?.click()}
           onSort={() => void sortRules()}
         />

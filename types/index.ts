@@ -101,6 +101,7 @@ export interface Profile {
   enabled: boolean;
   paused: boolean;
   hideComment: boolean;
+  filterOrder: string[];
 
   headers: HeaderRule[];
   respHeaders: HeaderRule[];

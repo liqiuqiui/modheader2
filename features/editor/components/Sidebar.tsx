@@ -1,8 +1,10 @@
 import { clsx } from "clsx";
+import { DragDropProvider, type DragEndEvent } from "@dnd-kit/react";
+import { isSortableOperation, useSortable } from "@dnd-kit/react/sortable";
 import {
-  ArrowDownToLine,
   ArrowUpDown,
   CircleHelp,
+  FileInput,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -13,6 +15,53 @@ import { useTranslation } from "react-i18next";
 import type { Profile } from "../../../types";
 import type { EditorMode } from "../types";
 
+function SortableProfileItem({
+  collapsed,
+  profile,
+  index,
+  selected,
+  onSelect,
+}: {
+  collapsed: boolean;
+  profile: Profile;
+  index: number;
+  selected: boolean;
+  onSelect: (index: number) => void;
+}) {
+  const { ref, isDragging } = useSortable({ id: profile.id, index });
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={() => onSelect(index)}
+      title={collapsed ? profile.title : undefined}
+      className={clsx(
+        "flex w-full cursor-grab touch-none items-center gap-2 rounded-lg p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] active:cursor-grabbing",
+        selected ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50",
+        profile.paused && "grayscale opacity-70",
+        isDragging && "opacity-45",
+      )}
+    >
+      <span
+        className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold shadow-sm"
+        style={{ backgroundColor: profile.backgroundColor, color: profile.textColor }}
+      >
+        {profile.shortTitle}
+        <span
+          className={clsx(
+            "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white",
+            profile.enabled && !profile.paused ? "bg-emerald-500" : "bg-slate-300",
+          )}
+        />
+      </span>
+      {!collapsed && (
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{profile.title}</span>
+      )}
+    </button>
+  );
+}
+
 export function Sidebar({
   mode,
   collapsed,
@@ -22,6 +71,7 @@ export function Sidebar({
   onCollapsedChange,
   onSearchChange,
   onSelect,
+  onReorder,
   onImport,
   onSort,
 }: {
@@ -33,10 +83,20 @@ export function Sidebar({
   onCollapsedChange: (collapsed: boolean) => void;
   onSearchChange: (query: string) => void;
   onSelect: (index: number) => void;
+  onReorder: (fromIndex: number, toIndex: number) => void;
   onImport: () => void;
   onSort: () => void;
 }) {
   const { t } = useTranslation();
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (event.canceled || !isSortableOperation(event.operation)) return;
+    const { source, target } = event.operation;
+    if (!source || !target) return;
+    if (source.sortable.index === target.sortable.index) return;
+    onReorder(source.sortable.index, target.sortable.index);
+  };
+
   return (
     <aside
       data-sidebar-collapsed={collapsed}
@@ -47,7 +107,7 @@ export function Sidebar({
     >
       <div
         className={clsx(
-          "flex h-[52px] items-center gap-2 border-b border-slate-100",
+          "flex h-14 items-center gap-2 border-b border-slate-100",
           collapsed ? "justify-center px-2" : "px-3",
         )}
       >
@@ -106,42 +166,20 @@ export function Sidebar({
             {t("profile.list")}
           </div>
         )}
-        <div className="space-y-1">
-          {profiles.map((profile, index) => {
-            const selected = index === selectedIndex;
-            return (
-              <button
-                type="button"
+        <DragDropProvider onDragEnd={handleDragEnd}>
+          <div className="space-y-1">
+            {profiles.map((profile, index) => (
+              <SortableProfileItem
                 key={profile.id}
-                onClick={() => onSelect(index)}
-                title={collapsed ? profile.title : undefined}
-                className={clsx(
-                  "flex w-full items-center gap-2 rounded-lg p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)]",
-                  selected ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50",
-                  profile.paused && "grayscale opacity-70",
-                )}
-              >
-                <span
-                  className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold shadow-sm"
-                  style={{ backgroundColor: profile.backgroundColor, color: profile.textColor }}
-                >
-                  {profile.shortTitle}
-                  <span
-                    className={clsx(
-                      "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white",
-                      profile.enabled && !profile.paused ? "bg-emerald-500" : "bg-slate-300",
-                    )}
-                  />
-                </span>
-                {!collapsed && (
-                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">
-                    {profile.title}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                collapsed={collapsed}
+                profile={profile}
+                index={index}
+                selected={index === selectedIndex}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        </DragDropProvider>
         {collapsed && (
           <div className="mt-3 space-y-1 border-t border-slate-100 pt-3">
             <button
@@ -151,7 +189,7 @@ export function Sidebar({
               onClick={onImport}
               className="flex h-10 w-full items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
             >
-              <ArrowDownToLine aria-hidden="true" className="h-4 w-4" />
+              <FileInput aria-hidden="true" className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -172,7 +210,7 @@ export function Sidebar({
               onClick={onImport}
               className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-xs text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
             >
-              <ArrowDownToLine aria-hidden="true" className="h-4 w-4" /> {t("nav.importFile")}
+              <FileInput aria-hidden="true" className="h-4 w-4" /> {t("nav.importFile")}
             </button>
             <button
               type="button"

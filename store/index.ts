@@ -30,6 +30,7 @@ export function createProfile(num: number, locale: Locale = "zh-CN"): Profile {
     enabled: true,
     paused: false,
     hideComment: true,
+    filterOrder: [],
     headers: [createHeaderRule()],
     respHeaders: [],
     cookies: [],
@@ -52,6 +53,7 @@ export function normalizeProfile(profile: Profile): Profile {
     enabled: profile.enabled ?? true,
     paused: profile.paused ?? false,
     hideComment: profile.hideComment ?? true,
+    filterOrder: profile.filterOrder ?? [],
     headers: (profile.headers ?? []).map((rule) => ({
       ...rule,
       comment: rule.comment ?? "",

@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { DragDropProvider, type DragEndEvent } from "@dnd-kit/react";
+import { isSortableOperation } from "@dnd-kit/react/sortable";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import type { Profile } from "../../../types";
@@ -9,9 +11,10 @@ import {
   addFilter,
   changeFilterKind,
   clearFilters,
+  deleteFilter,
+  reorderFilters,
   setAllFiltersEnabled,
   updateFilter,
-  withoutFilter,
 } from "../filterMutations";
 import type { FilterKind, FilterMode } from "../types";
 import { EmptyState } from "./EmptyState";
@@ -55,6 +58,11 @@ export function FilterSection({
   }, [filters, searchQuery, t]);
   const enabled = filters.some((filter) => filter.enabled);
   const currentTab = tabs.find((tab) => tab.id === currentTabId) ?? tabs.find((tab) => tab.active);
+  const filterIndices = useMemo(
+    () => new Map(filters.map((filter, index) => [filter.id, index])),
+    [filters],
+  );
+  const sortableDisabled = searchQuery.trim().length > 0;
 
   const handleAdd = (kind: FilterKind, mode: FilterMode = "include") => {
     const result = addFilter(profile, tabs, kind, mode, currentTabId);
@@ -78,6 +86,13 @@ export function FilterSection({
       }
       return next;
     });
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (event.canceled || !isSortableOperation(event.operation)) return;
+    const { source, target } = event.operation;
+    if (!source || !target || source.sortable.index === target.sortable.index) return;
+    onUpdate(reorderFilters(filters, source.sortable.index, target.sortable.index));
   };
 
   return (
@@ -112,21 +127,25 @@ export function FilterSection({
             onClose={() => setShowAddPanel(false)}
           />
         )}
-        {visibleFilters.map((filter) => (
-          <FilterRow
-            key={filter.id}
-            filter={filter}
-            autoFocusValue={filter.id === focusFilterId || filter.id === localFocusFilterId}
-            tabs={tabs}
-            currentTabId={currentTabId}
-            onPatch={(patch) => onUpdate(updateFilter(profile, filter, patch))}
-            onKindChange={(kind) =>
-              onUpdate(changeFilterKind(profile, tabs, filter, kind, currentTabId))
-            }
-            onDelete={() => onUpdate(withoutFilter(profile, filter.id))}
-            compact={compact}
-          />
-        ))}
+        <DragDropProvider onDragEnd={handleDragEnd}>
+          {visibleFilters.map((filter) => (
+            <FilterRow
+              key={filter.id}
+              filter={filter}
+              autoFocusValue={filter.id === focusFilterId || filter.id === localFocusFilterId}
+              tabs={tabs}
+              currentTabId={currentTabId}
+              onPatch={(patch) => onUpdate(updateFilter(profile, filter, patch))}
+              onKindChange={(kind) =>
+                onUpdate(changeFilterKind(profile, tabs, filter, kind, currentTabId))
+              }
+              onDelete={() => onUpdate(deleteFilter(profile, filter.id))}
+              sortableIndex={filterIndices.get(filter.id) ?? 0}
+              sortableDisabled={sortableDisabled}
+              compact={compact}
+            />
+          ))}
+        </DragDropProvider>
         {!compact && filters.length === 0 && <EmptyState label={t("filter.noFilters")} />}
         {filters.length > 0 && visibleFilters.length === 0 && (
           <EmptyState label={t("filter.noMatched")} />
