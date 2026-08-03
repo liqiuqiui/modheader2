@@ -1,0 +1,138 @@
+import { useMemo, useState } from "react";
+import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
+import type { Profile } from "../../../types";
+import type { BrowserTab } from "../../../types/browser";
+import { FILTER_LABEL_KEYS } from "../constants";
+import { profileFilters } from "../filterModel";
+import {
+  addFilter,
+  changeFilterKind,
+  clearFilters,
+  setAllFiltersEnabled,
+  updateFilter,
+  withoutFilter,
+} from "../filterMutations";
+import type { FilterKind, FilterMode } from "../types";
+import { EmptyState } from "./EmptyState";
+import { FilterAddPanel } from "./FilterAddPanel";
+import { FilterRow } from "./FilterRow";
+import { SectionHeader } from "./SectionHeader";
+
+export function FilterSection({
+  profile,
+  tabs,
+  searchQuery,
+  onUpdate,
+  focusFilterId,
+  compact = false,
+}: {
+  profile: Profile;
+  tabs: BrowserTab[];
+  searchQuery: string;
+  onUpdate: (patch: Partial<Profile>) => void;
+  focusFilterId?: string | null;
+  compact?: boolean;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(true);
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [draftKind, setDraftKind] = useState<FilterKind>("urlPattern");
+  const [draftMode, setDraftMode] = useState<FilterMode>("include");
+  const [localFocusFilterId, setLocalFocusFilterId] = useState<string | null>(null);
+  const filters = useMemo(() => profileFilters(profile), [profile]);
+  const visibleFilters = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return filters;
+    return filters.filter((filter) =>
+      `${t(FILTER_LABEL_KEYS[filter.kind])} ${filter.mode} ${filter.value} ${filter.comment}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [filters, searchQuery, t]);
+  const enabled = filters.some((filter) => filter.enabled);
+  const activeTab = tabs.find((tab) => tab.active);
+
+  const handleAdd = (kind: FilterKind, mode: FilterMode = "include") => {
+    const result = addFilter(profile, tabs, kind, mode);
+    if (result.focusId) setLocalFocusFilterId(result.focusId);
+    onUpdate(result.patch);
+    setOpen(true);
+    setShowAddPanel(false);
+  };
+
+  const handleAddButton = () => {
+    if (compact) {
+      handleAdd("urlPattern");
+      return;
+    }
+    setOpen(true);
+    setShowAddPanel((current) => {
+      const next = !current;
+      if (next) {
+        setDraftKind("urlPattern");
+        setDraftMode("include");
+      }
+      return next;
+    });
+  };
+
+  return (
+    <section>
+      <SectionHeader
+        title={t("section.filters")}
+        count={filters.length}
+        open={open}
+        enabled={enabled}
+        onToggle={() => setOpen((current) => !current)}
+        onToggleEnabled={() => onUpdate(setAllFiltersEnabled(profile, !enabled))}
+        onAdd={handleAddButton}
+        onClear={() => onUpdate(clearFilters())}
+        enableAllLabel={t("filter.enableAll")}
+        disableAllLabel={t("filter.disableAll")}
+        addLabel={t("filter.add")}
+        moreLabel={t("filter.more")}
+        clearLabel={t("filter.clear")}
+        addExpanded={showAddPanel}
+        addActive={showAddPanel}
+        rotateAddIcon
+      />
+      {open && (
+        <div className={clsx(compact ? "space-y-1.5" : "space-y-2")}>
+          {showAddPanel && (
+            <FilterAddPanel
+              draftKind={draftKind}
+              draftMode={draftMode}
+              activeTab={activeTab}
+              onKindChange={setDraftKind}
+              onModeChange={setDraftMode}
+              onAdd={() => handleAdd(draftKind, draftMode)}
+              onClose={() => setShowAddPanel(false)}
+            />
+          )}
+          {visibleFilters.map((filter) => (
+            <FilterRow
+              key={filter.id}
+              filter={filter}
+              autoFocusValue={filter.id === focusFilterId || filter.id === localFocusFilterId}
+              tabs={tabs}
+              onPatch={(patch) => onUpdate(updateFilter(profile, filter, patch))}
+              onKindChange={(kind) => onUpdate(changeFilterKind(profile, tabs, filter, kind))}
+              onDelete={() => onUpdate(withoutFilter(profile, filter.id))}
+              compact={compact}
+            />
+          ))}
+          {!compact && filters.length === 0 && <EmptyState label={t("filter.noFilters")} />}
+          {filters.length > 0 && visibleFilters.length === 0 && (
+            <EmptyState label={t("filter.noMatched")} />
+          )}
+          {!compact && filters.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-slate-100/70 px-4 py-3 text-xs text-slate-500">
+              {t("filter.help")}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

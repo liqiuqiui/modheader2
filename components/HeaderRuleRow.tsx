@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { clsx } from "clsx";
 import {
@@ -122,7 +122,7 @@ export function HeaderRuleRow({
         {!compact && (
           <select
             aria-label={t("header.mode")}
-            className="h-9 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[11px] text-slate-600 outline-none transition hover:bg-white focus:ring-2 focus:ring-[var(--theme-color)]"
+            className="h-9 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[11px] text-slate-600 outline-none transition hover:bg-white focus:ring-2 focus:ring-[var(--theme-color)]"
             value={rule.appendMode}
             onChange={(event) => onChange({ appendMode: event.target.value as AppendMode })}
           >

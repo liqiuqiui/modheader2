@@ -1,12 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Popover } from "radix-ui";
 import { clsx } from "clsx";
-import type { Browser } from "wxt/browser";
-import { Check, ChevronDown, Globe2, Search, X } from "lucide-react";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useThemePortalContainer } from "./ThemePortalProvider";
-
-export type BrowserTab = Browser.tabs.Tab;
+import type { BrowserTab } from "../types/browser";
+import { TabIcon } from "./TabIcon";
 
 function getHost(url?: string) {
   if (!url) return "";
@@ -15,25 +14,6 @@ function getHost(url?: string) {
   } catch {
     return url;
   }
-}
-
-function TabIcon({ tab, className = "h-4 w-4" }: { tab?: BrowserTab; className?: string }) {
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => setFailed(false), [tab?.favIconUrl]);
-
-  if (tab?.favIconUrl && !failed) {
-    return (
-      <img
-        src={tab.favIconUrl}
-        alt=""
-        loading="lazy"
-        className={clsx(className, "rounded-sm object-contain")}
-        onError={() => setFailed(true)}
-      />
-    );
-  }
-  return <Globe2 aria-hidden="true" className={clsx(className, "text-slate-400")} />;
 }
 
 export function TabPicker({
