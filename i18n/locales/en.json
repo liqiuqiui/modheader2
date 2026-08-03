@@ -51,14 +51,15 @@
   "toolbar": {
     "undo": "Undo",
     "redo": "Redo",
-    "pause": "Pause all rules",
-    "resume": "Resume all rules",
+    "pause": "Pause current profile",
+    "resume": "Resume current profile",
     "settings": "Settings",
     "profileMenu": "Profile menu",
     "addModification": "Add modification",
     "newProfile": "New profile",
     "expand": "Open in a tab",
-    "paused": "All rules are paused"
+    "paused": "Current profile is paused",
+    "pausedBadge": "PAUSED"
   },
   "section": {
     "requestHeaders": "Request Headers",
@@ -195,7 +196,7 @@
     "success": "Current rules sorted"
   },
   "context": {
-    "pause": "Pause ModHeader V2",
-    "resume": "Resume ModHeader V2"
+    "pause": "Pause current profile",
+    "resume": "Resume current profile"
   }
 }

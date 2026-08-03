@@ -51,14 +51,15 @@
   "toolbar": {
     "undo": "撤销",
     "redo": "重做",
-    "pause": "暂停全部规则",
-    "resume": "恢复全部规则",
+    "pause": "暂停当前配置",
+    "resume": "恢复当前配置",
     "settings": "设置",
     "profileMenu": "配置菜单",
     "addModification": "添加修改",
     "newProfile": "新增配置",
     "expand": "在新标签页打开",
-    "paused": "全部规则已暂停"
+    "paused": "当前配置已暂停",
+    "pausedBadge": "暂停中"
   },
   "section": {
     "requestHeaders": "请求头",
@@ -195,7 +196,7 @@
     "success": "当前规则已排序"
   },
   "context": {
-    "pause": "暂停 ModHeader V2",
-    "resume": "恢复 ModHeader V2"
+    "pause": "暂停当前配置",
+    "resume": "恢复当前配置"
   }
 }

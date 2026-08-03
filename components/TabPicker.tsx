@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Popover } from "radix-ui";
+import { clsx } from "clsx";
 import type { Browser } from "wxt/browser";
 import { Check, ChevronDown, Globe2, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -27,12 +28,12 @@ function TabIcon({ tab, className = "h-4 w-4" }: { tab?: BrowserTab; className?:
         src={tab.favIconUrl}
         alt=""
         loading="lazy"
-        className={`${className} rounded-sm object-contain`}
+        className={clsx(className, "rounded-sm object-contain")}
         onError={() => setFailed(true)}
       />
     );
   }
-  return <Globe2 aria-hidden="true" className={`${className} text-slate-400`} />;
+  return <Globe2 aria-hidden="true" className={clsx(className, "text-slate-400")} />;
 }
 
 export function TabPicker({
@@ -62,7 +63,8 @@ export function TabPicker({
     );
   }, [query, tabs]);
 
-  const label = selected?.title?.trim() || (value !== "" ? t("tab.closed", { id: value }) : t("tab.select"));
+  const label =
+    selected?.title?.trim() || (value !== "" ? t("tab.closed", { id: value }) : t("tab.select"));
   const host = selected ? getHost(selected.url) : "";
 
   return (
@@ -77,15 +79,21 @@ export function TabPicker({
         <Popover.Trigger asChild>
           <button
             type="button"
-            className={`flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white text-left text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:border-[var(--theme-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] data-[state=open]:border-[var(--theme-color)] ${
-              compact ? "h-8 px-2 text-xs" : "h-9 px-3 text-sm"
-            }`}
+            className={clsx(
+              "flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white text-left text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:border-[var(--theme-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] data-[state=open]:border-[var(--theme-color)]",
+              compact ? "h-8 px-2 text-xs" : "h-9 px-3 text-sm",
+            )}
             aria-haspopup="listbox"
           >
-            <TabIcon tab={selected} className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+            <TabIcon tab={selected} className={clsx(compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
             <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
-            {host && !compact && <span className="max-w-36 truncate text-xs text-slate-400">{host}</span>}
-            <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+            {host && !compact && (
+              <span className="max-w-36 truncate text-xs text-slate-400">{host}</span>
+            )}
+            <ChevronDown
+              aria-hidden="true"
+              className={clsx("h-4 w-4 shrink-0 text-slate-400 transition", open && "rotate-180")}
+            />
           </button>
         </Popover.Trigger>
       </div>
@@ -118,7 +126,11 @@ export function TabPicker({
                 className="min-w-0 flex-1 bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400"
               />
               {query && (
-                <button type="button" aria-label={t("tab.clearSearch")} onClick={() => setQuery("")}>
+                <button
+                  type="button"
+                  aria-label={t("tab.clearSearch")}
+                  onClick={() => setQuery("")}
+                >
                   <X aria-hidden="true" className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -126,7 +138,9 @@ export function TabPicker({
           </div>
           <div className="max-h-64 overflow-y-auto p-1" role="listbox">
             {filteredTabs.length === 0 ? (
-              <div className="px-3 py-6 text-center text-xs text-slate-400">{t("tab.noResults")}</div>
+              <div className="px-3 py-6 text-center text-xs text-slate-400">
+                {t("tab.noResults")}
+              </div>
             ) : (
               filteredTabs.map((tab) => {
                 const isSelected = tab.id === numericValue;
@@ -141,21 +155,32 @@ export function TabPicker({
                       setOpen(false);
                       setQuery("");
                     }}
-                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] ${
-                      isSelected ? "" : "text-slate-700 hover:bg-slate-50"
-                    }`}
-                    style={isSelected ? {
-                      backgroundColor: "color-mix(in srgb, var(--theme-color) 10%, white)",
-                      color: "var(--theme-color)",
-                    } : undefined}
+                    className={clsx(
+                      "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)]",
+                      !isSelected && "text-slate-700 hover:bg-slate-50",
+                    )}
+                    style={
+                      isSelected
+                        ? {
+                            backgroundColor: "color-mix(in srgb, var(--theme-color) 10%, white)",
+                            color: "var(--theme-color)",
+                          }
+                        : undefined
+                    }
                   >
                     <TabIcon tab={tab} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-medium">{tab.title || t("tab.untitled")}</span>
-                      <span className="block truncate text-[11px] text-slate-400">{getHost(tab.url) || tab.url}</span>
+                      <span className="block truncate text-xs font-medium">
+                        {tab.title || t("tab.untitled")}
+                      </span>
+                      <span className="block truncate text-[11px] text-slate-400">
+                        {getHost(tab.url) || tab.url}
+                      </span>
                     </span>
                     {tab.active && (
-                      <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">{t("common.current")}</span>
+                      <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
+                        {t("common.current")}
+                      </span>
                     )}
                     {isSelected && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
                   </button>

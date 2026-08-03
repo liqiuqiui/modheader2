@@ -1,4 +1,5 @@
 import React from "react";
+import { clsx } from "clsx";
 import { Plus, Trash2, Copy, Settings } from "lucide-react";
 import type { Profile } from "../types";
 import { Button } from "./ui/button";
@@ -41,11 +42,12 @@ export function ProfileSelector({
       {profiles.map((profile, index) => (
         <div
           key={profile.id}
-          className={`group flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors ${
+          className={clsx(
+            "group flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors",
             index === selectedIndex
               ? "bg-[hsl(var(--secondary))] border border-[hsl(var(--border))]"
-              : "hover:bg-[hsl(var(--secondary))]/50"
-          }`}
+              : "hover:bg-[hsl(var(--secondary))]/50",
+          )}
           onClick={() => onSelect(index)}
         >
           {/* Color badge */}
@@ -66,14 +68,20 @@ export function ProfileSelector({
           <div className="hidden group-hover:flex gap-0.5">
             <button
               className="p-0.5 rounded hover:bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
-              onClick={(e) => { e.stopPropagation(); onClone(index); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClone(index);
+              }}
               title="Clone"
             >
               <Copy className="h-3 w-3" />
             </button>
             <button
               className="p-0.5 rounded hover:bg-red-100 text-[hsl(var(--muted-foreground))] hover:text-red-600"
-              onClick={(e) => { e.stopPropagation(); onDelete(index); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(index);
+              }}
               title="Delete"
             >
               <Trash2 className="h-3 w-3" />

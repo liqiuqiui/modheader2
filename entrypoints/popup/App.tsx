@@ -1,13 +1,24 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { browser } from "wxt/browser";
-import { Pause, Play, Settings, Plus, Trash2, ChevronDown, ChevronRight, Languages } from "lucide-react";
 import {
-  profilesStorage, selectedIndexStorage, isPausedStorage,
-  loadState, addProfile, deleteProfile, updateProfile,
+  Pause,
+  Play,
+  Settings,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Languages,
+} from "lucide-react";
+import {
+  profilesStorage,
+  selectedIndexStorage,
+  loadState,
+  addProfile,
+  deleteProfile,
+  updateProfile,
 } from "../../store";
-import {
-  createHeaderRule, createUrlFilter, createTabFilter,
-} from "../../types";
+import { createHeaderRule, createUrlFilter, createTabFilter } from "../../types";
 import type { AppState, HeaderRule, UrlFilter, TabFilter, Profile } from "../../types";
 import { Switch } from "../../components/ui/switch";
 import { TabPicker, type BrowserTab } from "../../components/TabPicker";
@@ -16,35 +27,50 @@ import { useTranslation } from "react-i18next";
 export default function App() {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage === "en" ? "en" : "zh-CN";
-  const [state, setState] = useState<AppState>({ profiles: [], selectedProfileIndex: 0, isPaused: false });
+  const [state, setState] = useState<AppState>({ profiles: [], selectedProfileIndex: 0 });
   const [loaded, setLoaded] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    respHeaders: false, urlFilters: false, excludeUrlFilters: false, tabFilters: false,
+    respHeaders: false,
+    urlFilters: false,
+    excludeUrlFilters: false,
+    tabFilters: false,
   });
 
   useEffect(() => {
-    loadState().then((s) => { setState(s); setLoaded(true); });
+    loadState().then((s) => {
+      setState(s);
+      setLoaded(true);
+    });
     const u1 = profilesStorage.watch((p) => setState((s) => ({ ...s, profiles: p ?? [] })));
-    const u2 = selectedIndexStorage.watch((i) => setState((s) => ({ ...s, selectedProfileIndex: i })));
-    const u3 = isPausedStorage.watch((v) => setState((s) => ({ ...s, isPaused: v })));
-    return () => { u1(); u2(); u3(); };
+    const u2 = selectedIndexStorage.watch((i) =>
+      setState((s) => ({ ...s, selectedProfileIndex: i })),
+    );
+    return () => {
+      u1();
+      u2();
+    };
   }, []);
 
   const profile = state.profiles[state.selectedProfileIndex];
 
-  const patch = useCallback(async (changes: Partial<Profile>) => {
-    const updated = await updateProfile(state.profiles, state.selectedProfileIndex, changes);
-    setState((s) => ({ ...s, profiles: updated }));
-  }, [state.profiles, state.selectedProfileIndex]);
+  const patch = useCallback(
+    async (changes: Partial<Profile>) => {
+      const updated = await updateProfile(state.profiles, state.selectedProfileIndex, changes);
+      setState((s) => ({ ...s, profiles: updated }));
+    },
+    [state.profiles, state.selectedProfileIndex],
+  );
 
   const handleSelectProfile = async (i: number) => {
     await selectedIndexStorage.setValue(i);
     setState((s) => ({ ...s, selectedProfileIndex: i }));
   };
   const handleTogglePause = async () => {
-    const next = !state.isPaused;
-    await isPausedStorage.setValue(next);
-    setState((s) => ({ ...s, isPaused: next }));
+    if (!profile) return;
+    const profiles = await updateProfile(state.profiles, state.selectedProfileIndex, {
+      paused: !profile.paused,
+    });
+    setState((s) => ({ ...s, profiles }));
   };
   const handleAddProfile = async () => {
     const { profiles, index } = await addProfile(state.profiles, locale);
@@ -55,28 +81,49 @@ export default function App() {
     const { profiles, index } = await deleteProfile(state.profiles, i);
     setState((s) => ({ ...s, profiles, selectedProfileIndex: index }));
   };
-  const handleOpenOptions = () => { browser.runtime.openOptionsPage(); window.close(); };
+  const handleOpenOptions = () => {
+    browser.runtime.openOptionsPage();
+    window.close();
+  };
 
   const toggle = (key: string) => setExpanded((e) => ({ ...e, [key]: !e[key] }));
 
-  if (!loaded) return <div className="flex h-[580px] w-[780px] items-center justify-center bg-slate-50 text-sm text-slate-400">{t("common.loading")}</div>;
+  if (!loaded)
+    return (
+      <div className="flex h-[580px] w-[780px] items-center justify-center bg-slate-50 text-sm text-slate-400">
+        {t("common.loading")}
+      </div>
+    );
 
   const bg = profile?.backgroundColor ?? "#3b82f6";
   const fg = profile?.textColor ?? "white";
 
   return (
-    <div className="flex h-[580px] w-[780px] flex-col overflow-hidden bg-slate-50" style={{ fontFamily: "system-ui,sans-serif", fontSize: 13 }}>
+    <div
+      className="flex h-[580px] w-[780px] flex-col overflow-hidden bg-slate-50"
+      style={{ fontFamily: "system-ui,sans-serif", fontSize: 13 }}
+    >
       {/* ── Toolbar ── */}
-      <div className="flex items-center gap-2 px-4 py-2.5" style={{ backgroundColor: bg, color: fg, minHeight: 56 }}>
-        <div className="flex flex-1 items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+      <div
+        className="flex items-center gap-2 px-4 py-2.5"
+        style={{ backgroundColor: bg, color: fg, minHeight: 56 }}
+      >
+        <div
+          className="flex flex-1 items-center gap-2 overflow-x-auto"
+          style={{ scrollbarWidth: "none" }}
+        >
           {state.profiles.map((p, i) => (
             <button
               key={p.id}
               onClick={() => handleSelectProfile(i)}
-              onContextMenu={(e) => { e.preventDefault(); handleDeleteProfile(i, e); }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                handleDeleteProfile(i, e);
+              }}
               title={p.title}
               style={{
-                backgroundColor: p.backgroundColor, color: p.textColor,
+                backgroundColor: p.backgroundColor,
+                color: p.textColor,
                 border: `2px solid ${i === state.selectedProfileIndex ? "white" : "transparent"}`,
                 boxShadow: i === state.selectedProfileIndex ? "0 0 0 1px rgba(0,0,0,0.25)" : "none",
               }}
@@ -85,36 +132,49 @@ export default function App() {
               {p.shortTitle}
             </button>
           ))}
-          <button onClick={handleAddProfile} title={t("profile.add")} style={{ color: fg }}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full opacity-70 transition-opacity hover:bg-black/10 hover:opacity-100">
+          <button
+            onClick={handleAddProfile}
+            title={t("profile.add")}
+            style={{ color: fg }}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full opacity-70 transition-opacity hover:bg-white/15 hover:opacity-100"
+          >
             <Plus className="h-4 w-4" />
           </button>
         </div>
-        <span className="mx-2 max-w-[220px] truncate text-sm font-semibold" style={{ color: fg }}>{profile?.title}</span>
-        <button onClick={handleTogglePause} title={state.isPaused ? t("toolbar.resume") : t("toolbar.pause")} style={{ color: fg }}
-          className="flex-shrink-0 rounded-lg p-2 transition-colors hover:bg-black/10">
-          {state.isPaused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
+        <span className="mx-2 max-w-[220px] truncate text-sm font-semibold" style={{ color: fg }}>
+          {profile?.title}
+        </span>
+        {profile?.paused && (
+          <span className="rounded-md border border-white/25 bg-white/15 px-2 py-1 text-[10px] font-bold tracking-[0.08em]">
+            {t("toolbar.pausedBadge")}
+          </span>
+        )}
+        <button
+          onClick={handleTogglePause}
+          title={profile?.paused ? t("toolbar.resume") : t("toolbar.pause")}
+          style={{ color: fg }}
+          className="flex-shrink-0 rounded-lg p-2 transition-colors hover:bg-white/15"
+        >
+          {profile?.paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
         </button>
         <button
           onClick={() => void i18n.changeLanguage(locale === "zh-CN" ? "en" : "zh-CN")}
           title={t("common.language")}
           style={{ color: fg }}
-          className="flex h-9 items-center gap-1 rounded-lg px-2 text-xs font-semibold transition-colors hover:bg-black/10"
+          className="flex h-9 items-center gap-1 rounded-lg px-2 text-xs font-semibold transition-colors hover:bg-white/15"
         >
           <Languages className="h-4 w-4" />
           {locale === "zh-CN" ? "EN" : "中"}
         </button>
-        <button onClick={handleOpenOptions} title={t("toolbar.settings")} style={{ color: fg }}
-          className="flex-shrink-0 rounded-lg p-2 transition-colors hover:bg-black/10">
+        <button
+          onClick={handleOpenOptions}
+          title={t("toolbar.settings")}
+          style={{ color: fg }}
+          className="flex-shrink-0 rounded-lg p-2 transition-colors hover:bg-white/15"
+        >
           <Settings className="h-5 w-5" />
         </button>
       </div>
-
-      {state.isPaused && (
-        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-700">
-          {t("toolbar.paused")}
-        </div>
-      )}
 
       {profile && (
         <div className="flex-1 overflow-y-auto divide-y divide-slate-200/70">
@@ -124,7 +184,9 @@ export default function App() {
             rules={profile.headers}
             alwaysOpen
             onAdd={() => patch({ headers: [...profile.headers, createHeaderRule()] })}
-            onPatch={(id, p) => patch({ headers: profile.headers.map((r) => r.id === id ? { ...r, ...p } : r) })}
+            onPatch={(id, p) =>
+              patch({ headers: profile.headers.map((r) => (r.id === id ? { ...r, ...p } : r)) })
+            }
             onDelete={(id) => patch({ headers: profile.headers.filter((r) => r.id !== id) })}
           />
 
@@ -135,8 +197,14 @@ export default function App() {
             open={expanded.respHeaders}
             onToggle={() => toggle("respHeaders")}
             onAdd={() => patch({ respHeaders: [...profile.respHeaders, createHeaderRule()] })}
-            onPatch={(id, p) => patch({ respHeaders: profile.respHeaders.map((r) => r.id === id ? { ...r, ...p } : r) })}
-            onDelete={(id) => patch({ respHeaders: profile.respHeaders.filter((r) => r.id !== id) })}
+            onPatch={(id, p) =>
+              patch({
+                respHeaders: profile.respHeaders.map((r) => (r.id === id ? { ...r, ...p } : r)),
+              })
+            }
+            onDelete={(id) =>
+              patch({ respHeaders: profile.respHeaders.filter((r) => r.id !== id) })
+            }
           />
 
           {/* URL Filters */}
@@ -147,7 +215,11 @@ export default function App() {
             open={expanded.urlFilters}
             onToggle={() => toggle("urlFilters")}
             onAdd={() => patch({ urlFilters: [...profile.urlFilters, createUrlFilter()] })}
-            onPatch={(id, p) => patch({ urlFilters: profile.urlFilters.map((r) => r.id === id ? { ...r, ...p } : r) })}
+            onPatch={(id, p) =>
+              patch({
+                urlFilters: profile.urlFilters.map((r) => (r.id === id ? { ...r, ...p } : r)),
+              })
+            }
             onDelete={(id) => patch({ urlFilters: profile.urlFilters.filter((r) => r.id !== id) })}
             placeholder="e.g. https://api\\.example\\.com/.*"
           />
@@ -159,9 +231,19 @@ export default function App() {
             items={profile.excludeUrlFilters}
             open={expanded.excludeUrlFilters}
             onToggle={() => toggle("excludeUrlFilters")}
-            onAdd={() => patch({ excludeUrlFilters: [...profile.excludeUrlFilters, createUrlFilter()] })}
-            onPatch={(id, p) => patch({ excludeUrlFilters: profile.excludeUrlFilters.map((r) => r.id === id ? { ...r, ...p } : r) })}
-            onDelete={(id) => patch({ excludeUrlFilters: profile.excludeUrlFilters.filter((r) => r.id !== id) })}
+            onAdd={() =>
+              patch({ excludeUrlFilters: [...profile.excludeUrlFilters, createUrlFilter()] })
+            }
+            onPatch={(id, p) =>
+              patch({
+                excludeUrlFilters: profile.excludeUrlFilters.map((r) =>
+                  r.id === id ? { ...r, ...p } : r,
+                ),
+              })
+            }
+            onDelete={(id) =>
+              patch({ excludeUrlFilters: profile.excludeUrlFilters.filter((r) => r.id !== id) })
+            }
             placeholder="e.g. .*\\.png$"
           />
 
@@ -171,7 +253,11 @@ export default function App() {
             open={expanded.tabFilters}
             onToggle={() => toggle("tabFilters")}
             onAdd={() => patch({ tabFilters: [...profile.tabFilters, createTabFilter()] })}
-            onPatch={(id, p) => patch({ tabFilters: profile.tabFilters.map((r) => r.id === id ? { ...r, ...p } : r) })}
+            onPatch={(id, p) =>
+              patch({
+                tabFilters: profile.tabFilters.map((r) => (r.id === id ? { ...r, ...p } : r)),
+              })
+            }
             onDelete={(id) => patch({ tabFilters: profile.tabFilters.filter((r) => r.id !== id) })}
           />
         </div>
@@ -193,7 +279,16 @@ interface HeaderSectionProps {
   onDelete: (id: string) => void;
 }
 
-function HeaderSection({ title, rules, open, alwaysOpen, onToggle, onAdd, onPatch, onDelete }: HeaderSectionProps) {
+function HeaderSection({
+  title,
+  rules,
+  open,
+  alwaysOpen,
+  onToggle,
+  onAdd,
+  onPatch,
+  onDelete,
+}: HeaderSectionProps) {
   const { t } = useTranslation();
   const isOpen = alwaysOpen || open;
   const badge = rules.length > 0 ? rules.length : null;
@@ -220,10 +315,15 @@ function HeaderSection({ title, rules, open, alwaysOpen, onToggle, onAdd, onPatc
       {isOpen && (
         <>
           {rules.length === 0 && (
-            <div className="mx-5 my-4 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-center text-sm italic text-slate-400">{t("section.noRulesShort")}</div>
+            <div className="mx-5 my-4 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-center text-sm italic text-slate-400">
+              {t("section.noRulesShort")}
+            </div>
           )}
           {rules.map((rule) => (
-            <div key={rule.id} className="group mx-5 my-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:border-slate-300">
+            <div
+              key={rule.id}
+              className="group mx-5 my-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:border-slate-300"
+            >
               <Switch
                 checked={rule.enabled}
                 onCheckedChange={(v) => onPatch(rule.id, { enabled: v })}
@@ -280,7 +380,17 @@ interface FilterSectionProps {
   placeholder: string;
 }
 
-function FilterSection({ title, hint, items, open, onToggle, onAdd, onPatch, onDelete, placeholder }: FilterSectionProps) {
+function FilterSection({
+  title,
+  hint,
+  items,
+  open,
+  onToggle,
+  onAdd,
+  onPatch,
+  onDelete,
+  placeholder,
+}: FilterSectionProps) {
   const { t } = useTranslation();
   const badge = items.length > 0 ? items.length : null;
 
@@ -303,9 +413,14 @@ function FilterSection({ title, hint, items, open, onToggle, onAdd, onPatch, onD
       </button>
       {open && (
         <>
-          <div className="mx-5 mt-4 rounded-lg bg-slate-100 px-4 py-3 text-xs italic text-slate-500">{hint}</div>
+          <div className="mx-5 mt-4 rounded-lg bg-slate-100 px-4 py-3 text-xs italic text-slate-500">
+            {hint}
+          </div>
           {items.map((item) => (
-            <div key={item.id} className="group mx-5 my-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:border-slate-300">
+            <div
+              key={item.id}
+              className="group mx-5 my-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:border-slate-300"
+            >
               <Switch
                 checked={item.enabled}
                 onCheckedChange={(v) => onPatch(item.id, { enabled: v })}
@@ -351,7 +466,14 @@ interface TabFilterSectionProps {
   onDelete: (id: string) => void;
 }
 
-function TabFilterSection({ items, open, onToggle, onAdd, onPatch, onDelete }: TabFilterSectionProps) {
+function TabFilterSection({
+  items,
+  open,
+  onToggle,
+  onAdd,
+  onPatch,
+  onDelete,
+}: TabFilterSectionProps) {
   const { t } = useTranslation();
   const badge = items.length > 0 ? items.length : null;
   const [tabs, setTabs] = useState<BrowserTab[]>([]);
@@ -360,7 +482,8 @@ function TabFilterSection({ items, open, onToggle, onAdd, onPatch, onDelete }: T
     let alive = true;
     const refresh = async () => {
       const nextTabs = await browser.tabs.query({});
-      if (alive) setTabs(nextTabs.sort((left, right) => Number(right.active) - Number(left.active)));
+      if (alive)
+        setTabs(nextTabs.sort((left, right) => Number(right.active) - Number(left.active)));
     };
     void refresh();
     browser.tabs.onCreated.addListener(refresh);
@@ -394,7 +517,10 @@ function TabFilterSection({ items, open, onToggle, onAdd, onPatch, onDelete }: T
             {t("filter.tabHint")}
           </div>
           {items.map((item) => (
-            <div key={item.id} className="group mx-5 my-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:border-slate-300">
+            <div
+              key={item.id}
+              className="group mx-5 my-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:border-slate-300"
+            >
               <Switch
                 checked={item.enabled}
                 onCheckedChange={(v) => onPatch(item.id, { enabled: v })}

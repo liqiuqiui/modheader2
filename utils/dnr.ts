@@ -38,9 +38,7 @@ function enabledValues<T extends { enabled: boolean }>(items: T[] | undefined): 
   return (items ?? []).filter((item) => item.enabled);
 }
 
-function applyProfileConditions(
-  profile: Profile,
-): Browser.declarativeNetRequest.RuleCondition {
+function applyProfileConditions(profile: Profile): Browser.declarativeNetRequest.RuleCondition {
   const condition: Browser.declarativeNetRequest.RuleCondition = {
     resourceTypes: DEFAULT_RESOURCE_TYPES,
   };
@@ -79,13 +77,15 @@ function applyProfileConditions(
   const includedMethods = methods
     .filter((filter) => !filter.exclude)
     .map((filter) => filter.method);
-  const excludedMethods = methods
-    .filter((filter) => filter.exclude)
-    .map((filter) => filter.method);
+  const excludedMethods = methods.filter((filter) => filter.exclude).map((filter) => filter.method);
   if (includedMethods.length > 0) {
-    condition.requestMethods = [...new Set(includedMethods)] as Browser.declarativeNetRequest.RequestMethod[];
+    condition.requestMethods = [
+      ...new Set(includedMethods),
+    ] as Browser.declarativeNetRequest.RequestMethod[];
   } else if (excludedMethods.length > 0) {
-    condition.excludedRequestMethods = [...new Set(excludedMethods)] as Browser.declarativeNetRequest.RequestMethod[];
+    condition.excludedRequestMethods = [
+      ...new Set(excludedMethods),
+    ] as Browser.declarativeNetRequest.RequestMethod[];
   }
 
   const domains = enabledValues<DomainFilter>(profile.initiatorDomainFilters)
@@ -95,11 +95,10 @@ function applyProfileConditions(
     .filter((filter) => !filter.exclude)
     .map((filter) => filter.domain.trim())
     .filter(Boolean);
-  const excludedDomains = domains.filter(
-    (domain) => !includedDomains.includes(domain),
-  );
+  const excludedDomains = domains.filter((domain) => !includedDomains.includes(domain));
   if (includedDomains.length > 0) condition.initiatorDomains = [...new Set(includedDomains)];
-  if (excludedDomains.length > 0) condition.excludedInitiatorDomains = [...new Set(excludedDomains)];
+  if (excludedDomains.length > 0)
+    condition.excludedInitiatorDomains = [...new Set(excludedDomains)];
 
   return condition;
 }
@@ -184,11 +183,7 @@ function cookiesToDnr(
   };
 }
 
-function excludeUrlToDnr(
-  filter: UrlFilter,
-  id: number,
-  profile: Profile,
-): DnrRule | null {
+function excludeUrlToDnr(filter: UrlFilter, id: number, profile: Profile): DnrRule | null {
   if (!filter.enabled || !filter.urlRegex.trim()) return null;
   return {
     id,
@@ -202,20 +197,16 @@ function activeUrlFilters(filters: UrlFilter[] | undefined): UrlFilter[] {
   return enabledValues(filters).filter((filter) => filter.urlRegex.trim());
 }
 
-export function profilesToDnrRules(
-  profiles: Profile[],
-  selectedIndex: number,
-  isPaused: boolean,
-): DnrRule[] {
-  if (isPaused) return [];
+export function profilesToDnrRules(profiles: Profile[], selectedIndex: number): DnrRule[] {
   const profile = profiles[selectedIndex];
-  if (!profile || !profile.enabled) return [];
+  if (!profile || !profile.enabled || profile.paused) return [];
 
   const rules: DnrRule[] = [];
   let ruleId = DNR_RULE_ID_BASE;
   const includeFilters = activeUrlFilters(profile.urlFilters);
   const excludeFilters = activeUrlFilters(profile.excludeUrlFilters);
-  const urlVariants: Array<UrlFilter | undefined> = includeFilters.length > 0 ? includeFilters : [undefined];
+  const urlVariants: Array<UrlFilter | undefined> =
+    includeFilters.length > 0 ? includeFilters : [undefined];
 
   // 排除规则使用更高优先级的 allow，让后续修改规则不再继续处理该请求。
   for (const filter of excludeFilters) {

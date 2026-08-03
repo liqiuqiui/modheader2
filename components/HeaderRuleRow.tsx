@@ -1,6 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowRightLeft, Copy, Eye, EyeOff, GripVertical, MessageSquarePlus, MoreHorizontal, Trash2 } from "lucide-react";
+import { clsx } from "clsx";
+import {
+  ArrowRightLeft,
+  Copy,
+  Eye,
+  EyeOff,
+  GripVertical,
+  MessageSquarePlus,
+  MoreHorizontal,
+  Trash2,
+} from "lucide-react";
 import type { HeaderRule, AppendMode } from "../types";
 import { Switch } from "./ui/switch";
 import { Input } from "./ui/input";
@@ -22,7 +32,16 @@ function isSensitiveHeader(name: string) {
   return /authorization|cookie|set-cookie|token|secret|password|api[-_]?key/i.test(name);
 }
 
-export function HeaderRuleRow({ rule, onChange, onDelete, onClone, onConvert, convertLabel, autoFocus, compact = false }: HeaderRuleRowProps) {
+export function HeaderRuleRow({
+  rule,
+  onChange,
+  onDelete,
+  onClone,
+  onConvert,
+  convertLabel,
+  autoFocus,
+  compact = false,
+}: HeaderRuleRowProps) {
   const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
   const [showComment, setShowComment] = useState(Boolean(rule.comment));
@@ -39,9 +58,20 @@ export function HeaderRuleRow({ rule, onChange, onDelete, onClone, onConvert, co
   ];
 
   return (
-    <div className={`group rounded-lg border bg-white ${compact ? "p-1.5 shadow-sm" : "p-2.5 shadow-sm"} transition ${rule.enabled ? "border-slate-200" : "border-slate-200/70 opacity-60"}`}>
+    <div
+      className={clsx(
+        "group rounded-lg border bg-white transition",
+        compact ? "p-1.5 shadow-sm" : "p-2.5 shadow-sm",
+        rule.enabled ? "border-slate-200" : "border-slate-200/70 opacity-60",
+      )}
+    >
       <div className="flex items-center gap-2">
-        {!compact && <GripVertical aria-hidden="true" className="hidden h-4 w-4 shrink-0 cursor-grab text-slate-300 sm:block" />}
+        {!compact && (
+          <GripVertical
+            aria-hidden="true"
+            className="hidden h-4 w-4 shrink-0 cursor-grab text-slate-300 sm:block"
+          />
+        )}
         <Switch
           checked={rule.enabled}
           onCheckedChange={(enabled) => onChange({ enabled })}
@@ -50,7 +80,10 @@ export function HeaderRuleRow({ rule, onChange, onDelete, onClone, onConvert, co
         />
         <Input
           aria-label={t("header.name")}
-          className={`${compact ? "h-8" : "h-9"} min-w-0 flex-[0.85] border-slate-200 bg-slate-50 font-mono text-xs shadow-none focus-visible:bg-white`}
+          className={clsx(
+            compact ? "h-8" : "h-9",
+            "min-w-0 flex-[0.85] border-slate-200 bg-slate-50 font-mono text-xs shadow-none focus-visible:bg-white",
+          )}
           placeholder={t("header.namePlaceholder")}
           value={rule.name}
           autoFocus={autoFocus && !rule.name}
@@ -61,7 +94,10 @@ export function HeaderRuleRow({ rule, onChange, onDelete, onClone, onConvert, co
           <Input
             aria-label={t("header.value")}
             type={sensitive && !revealed ? "password" : "text"}
-            className={`${compact ? "h-8" : "h-9"} border-slate-200 bg-slate-50 pr-9 font-mono text-xs shadow-none focus-visible:bg-white`}
+            className={clsx(
+              compact ? "h-8" : "h-9",
+              "border-slate-200 bg-slate-50 pr-9 font-mono text-xs shadow-none focus-visible:bg-white",
+            )}
             placeholder={t("header.valuePlaceholder")}
             value={rule.value}
             autoFocus={autoFocus && Boolean(rule.name)}
@@ -75,7 +111,11 @@ export function HeaderRuleRow({ rule, onChange, onDelete, onClone, onConvert, co
               className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
               onClick={() => setRevealed((current) => !current)}
             >
-              {revealed ? <EyeOff aria-hidden="true" className="h-3.5 w-3.5" /> : <Eye aria-hidden="true" className="h-3.5 w-3.5" />}
+              {revealed ? (
+                <EyeOff aria-hidden="true" className="h-3.5 w-3.5" />
+              ) : (
+                <Eye aria-hidden="true" className="h-3.5 w-3.5" />
+              )}
             </button>
           )}
         </div>
@@ -87,7 +127,9 @@ export function HeaderRuleRow({ rule, onChange, onDelete, onClone, onConvert, co
             onChange={(event) => onChange({ appendMode: event.target.value as AppendMode })}
           >
             {appendModes.map((mode) => (
-              <option key={mode.value} value={mode.value}>{mode.label}</option>
+              <option key={mode.value} value={mode.value}>
+                {mode.label}
+              </option>
             ))}
           </select>
         )}
@@ -111,7 +153,11 @@ export function HeaderRuleRow({ rule, onChange, onDelete, onClone, onConvert, co
             </button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
-            <DropdownMenu.Content align="end" sideOffset={6} className="z-[100] min-w-44 rounded-xl border border-slate-200 bg-white p-1.5 text-slate-800 shadow-xl">
+            <DropdownMenu.Content
+              align="end"
+              sideOffset={6}
+              className="z-[100] min-w-44 rounded-xl border border-slate-200 bg-white p-1.5 text-slate-800 shadow-xl"
+            >
               <DropdownMenu.Item
                 className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs outline-none transition hover:bg-slate-100 focus:bg-slate-100"
                 onSelect={() => {
@@ -119,15 +165,22 @@ export function HeaderRuleRow({ rule, onChange, onDelete, onClone, onConvert, co
                   window.setTimeout(() => commentRef.current?.focus(), 0);
                 }}
               >
-                <MessageSquarePlus aria-hidden="true" className="h-3.5 w-3.5" /> {t("header.addComment")}
+                <MessageSquarePlus aria-hidden="true" className="h-3.5 w-3.5" />{" "}
+                {t("header.addComment")}
               </DropdownMenu.Item>
               {onClone && (
-                <DropdownMenu.Item className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs outline-none transition hover:bg-slate-100 focus:bg-slate-100" onSelect={onClone}>
+                <DropdownMenu.Item
+                  className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs outline-none transition hover:bg-slate-100 focus:bg-slate-100"
+                  onSelect={onClone}
+                >
                   <Copy aria-hidden="true" className="h-3.5 w-3.5" /> {t("header.clone")}
                 </DropdownMenu.Item>
               )}
               {onConvert && convertLabel && (
-                <DropdownMenu.Item className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs outline-none transition hover:bg-slate-100 focus:bg-slate-100" onSelect={onConvert}>
+                <DropdownMenu.Item
+                  className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs outline-none transition hover:bg-slate-100 focus:bg-slate-100"
+                  onSelect={onConvert}
+                >
                   <ArrowRightLeft aria-hidden="true" className="h-3.5 w-3.5" /> {convertLabel}
                 </DropdownMenu.Item>
               )}

@@ -16,10 +16,6 @@ export const selectedIndexStorage = storage.defineItem<number>("local:selectedIn
   defaultValue: 0,
 });
 
-export const isPausedStorage = storage.defineItem<boolean>("local:isPaused", {
-  defaultValue: false,
-});
-
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 export function createProfile(num: number, locale: Locale = "zh-CN"): Profile {
@@ -32,6 +28,7 @@ export function createProfile(num: number, locale: Locale = "zh-CN"): Profile {
     backgroundColor: bg,
     textColor: getTextColor(bg),
     enabled: true,
+    paused: false,
     hideComment: true,
     headers: [createHeaderRule()],
     respHeaders: [],
@@ -53,6 +50,7 @@ export function normalizeProfile(profile: Profile): Profile {
     ...profile,
     version: 2,
     enabled: profile.enabled ?? true,
+    paused: profile.paused ?? false,
     hideComment: profile.hideComment ?? true,
     headers: (profile.headers ?? []).map((rule) => ({
       ...rule,
@@ -92,10 +90,9 @@ export function normalizeProfiles(profiles: Profile[] | undefined | null): Profi
 }
 
 export async function loadState(): Promise<AppState> {
-  const [profiles, selectedProfileIndex, isPaused] = await Promise.all([
+  const [profiles, selectedProfileIndex] = await Promise.all([
     profilesStorage.getValue(),
     selectedIndexStorage.getValue(),
-    isPausedStorage.getValue(),
   ]);
 
   let profs = normalizeProfiles(profiles);
@@ -105,7 +102,7 @@ export async function loadState(): Promise<AppState> {
   }
 
   const idx = Math.max(0, Math.min(selectedProfileIndex, profs.length - 1));
-  return { profiles: profs, selectedProfileIndex: idx, isPaused };
+  return { profiles: profs, selectedProfileIndex: idx };
 }
 
 export async function saveProfiles(profiles: Profile[], selectedIndex: number) {
@@ -115,11 +112,10 @@ export async function saveProfiles(profiles: Profile[], selectedIndex: number) {
   ]);
 }
 
-export async function setIsPaused(paused: boolean) {
-  await isPausedStorage.setValue(paused);
-}
-
-export async function addProfile(profiles: Profile[], locale: Locale = "zh-CN"): Promise<{ profiles: Profile[]; index: number }> {
+export async function addProfile(
+  profiles: Profile[],
+  locale: Locale = "zh-CN",
+): Promise<{ profiles: Profile[]; index: number }> {
   const num = profiles.length + 1;
   const newProfile = createProfile(num, locale);
   const updated = [...profiles, newProfile];
@@ -162,7 +158,11 @@ export async function cloneProfile(
   return { profiles: updated, index: newIndex };
 }
 
-export async function updateProfile(profiles: Profile[], index: number, patch: Partial<Profile>): Promise<Profile[]> {
+export async function updateProfile(
+  profiles: Profile[],
+  index: number,
+  patch: Partial<Profile>,
+): Promise<Profile[]> {
   const updated = profiles.map((p, i) => {
     if (i !== index) return p;
     const merged = { ...p, ...patch };

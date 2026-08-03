@@ -48,7 +48,15 @@ export interface TabFilter {
   comment: string;
 }
 
-export type RequestMethod = "connect" | "delete" | "get" | "head" | "options" | "patch" | "post" | "put";
+export type RequestMethod =
+  | "connect"
+  | "delete"
+  | "get"
+  | "head"
+  | "options"
+  | "patch"
+  | "post"
+  | "put";
 
 export interface MethodFilter {
   id: string;
@@ -68,7 +76,7 @@ export interface TimeFilter {
 export interface UrlReplacement {
   id: string;
   enabled: boolean;
-  name: string;  // regex pattern
+  name: string; // regex pattern
   value: string; // replacement
   comment: string;
 }
@@ -91,6 +99,7 @@ export interface Profile {
   backgroundColor: string;
   textColor: string;
   enabled: boolean;
+  paused: boolean;
   hideComment: boolean;
 
   headers: HeaderRule[];
@@ -111,7 +120,6 @@ export interface Profile {
 export interface AppState {
   profiles: Profile[];
   selectedProfileIndex: number;
-  isPaused: boolean;
 }
 
 // ─── Factory helpers ───────────────────────────────────────────────────────
@@ -171,7 +179,14 @@ export function createDomainFilter(overrides?: Partial<DomainFilter>): DomainFil
 }
 
 export function createResourceFilter(overrides?: Partial<ResourceFilter>): ResourceFilter {
-  return { id: nanoid(), enabled: true, resourceType: ["xmlhttprequest"], exclude: false, comment: "", ...overrides };
+  return {
+    id: nanoid(),
+    enabled: true,
+    resourceType: ["xmlhttprequest"],
+    exclude: false,
+    comment: "",
+    ...overrides,
+  };
 }
 
 export function createMethodFilter(overrides?: Partial<MethodFilter>): MethodFilter {
