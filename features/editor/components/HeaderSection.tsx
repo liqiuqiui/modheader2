@@ -5,6 +5,7 @@ import { HeaderRuleRow } from "../../../components/HeaderRuleRow";
 import { createHeaderRule } from "../../../types";
 import type { HeaderRule } from "../../../types";
 import { EmptyState } from "./EmptyState";
+import { SectionContent } from "./SectionContent";
 import { SectionHeader } from "./SectionHeader";
 
 export function HeaderSection({
@@ -56,34 +57,32 @@ export function HeaderSection({
         }}
         onClear={() => onChange([])}
       />
-      {open && (
-        <div className={clsx(compact ? "space-y-1.5" : "space-y-2")}>
-          {visibleRules.map((rule) => (
-            <HeaderRuleRow
-              key={rule.id}
-              rule={rule}
-              autoFocus={rule.id === focusRuleId || rule.id === localFocusRuleId}
-              onChange={(patch) =>
-                onChange(rules.map((item) => (item.id === rule.id ? { ...item, ...patch } : item)))
-              }
-              onDelete={() => onChange(rules.filter((item) => item.id !== rule.id))}
-              onClone={() => {
-                const clone = { ...rule, id: createHeaderRule().id };
-                setLocalFocusRuleId(clone.id);
-                onChange([...rules, clone]);
-                setOpen(true);
-              }}
-              convertLabel={convertLabel}
-              onConvert={onConvertRule ? () => onConvertRule(rule) : undefined}
-              compact={compact}
-            />
-          ))}
-          {!compact && rules.length === 0 && <EmptyState label={t("section.noRules", { title })} />}
-          {rules.length > 0 && visibleRules.length === 0 && (
-            <EmptyState label={t("section.noMatchedRules")} />
-          )}
-        </div>
-      )}
+      <SectionContent open={open} className={clsx(compact ? "space-y-1.5" : "space-y-2")}>
+        {visibleRules.map((rule) => (
+          <HeaderRuleRow
+            key={rule.id}
+            rule={rule}
+            autoFocus={rule.id === focusRuleId || rule.id === localFocusRuleId}
+            onChange={(patch) =>
+              onChange(rules.map((item) => (item.id === rule.id ? { ...item, ...patch } : item)))
+            }
+            onDelete={() => onChange(rules.filter((item) => item.id !== rule.id))}
+            onClone={() => {
+              const clone = { ...rule, id: createHeaderRule().id };
+              setLocalFocusRuleId(clone.id);
+              onChange([...rules, clone]);
+              setOpen(true);
+            }}
+            convertLabel={convertLabel}
+            onConvert={onConvertRule ? () => onConvertRule(rule) : undefined}
+            compact={compact}
+          />
+        ))}
+        {!compact && rules.length === 0 && <EmptyState label={t("section.noRules", { title })} />}
+        {rules.length > 0 && visibleRules.length === 0 && (
+          <EmptyState label={t("section.noMatchedRules")} />
+        )}
+      </SectionContent>
     </section>
   );
 }

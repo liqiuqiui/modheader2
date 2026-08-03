@@ -4,6 +4,7 @@ import { createUrlReplacement } from "../../../types";
 import type { UrlReplacement } from "../../../types";
 import { EmptyState } from "./EmptyState";
 import { RedirectRuleRow } from "./RedirectRuleRow";
+import { SectionContent } from "./SectionContent";
 import { SectionHeader } from "./SectionHeader";
 
 export function RedirectSection({
@@ -39,25 +40,23 @@ export function RedirectSection({
         }}
         onClear={() => onChange([])}
       />
-      {open && (
-        <div className="space-y-2">
-          {visible.map((item) => (
-            <RedirectRuleRow
-              key={item.id}
-              replacement={item}
-              onChange={(patch) =>
-                onChange(
-                  replacements.map((current) =>
-                    current.id === item.id ? { ...current, ...patch } : current,
-                  ),
-                )
-              }
-              onDelete={() => onChange(replacements.filter((current) => current.id !== item.id))}
-            />
-          ))}
-          {replacements.length === 0 && <EmptyState label={t("redirect.none")} />}
-        </div>
-      )}
+      <SectionContent open={open} className="space-y-2">
+        {visible.map((item) => (
+          <RedirectRuleRow
+            key={item.id}
+            replacement={item}
+            onChange={(patch) =>
+              onChange(
+                replacements.map((current) =>
+                  current.id === item.id ? { ...current, ...patch } : current,
+                ),
+              )
+            }
+            onDelete={() => onChange(replacements.filter((current) => current.id !== item.id))}
+          />
+        ))}
+        {replacements.length === 0 && <EmptyState label={t("redirect.none")} />}
+      </SectionContent>
     </section>
   );
 }

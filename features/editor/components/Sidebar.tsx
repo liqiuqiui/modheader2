@@ -118,6 +118,7 @@ export function Sidebar({
                 className={clsx(
                   "flex w-full items-center gap-2 rounded-lg p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)]",
                   selected ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50",
+                  profile.paused && "grayscale opacity-70",
                 )}
               >
                 <span

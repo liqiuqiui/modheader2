@@ -298,8 +298,10 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
 
         <main
           className={clsx(
-            "flex min-w-0 flex-1 flex-col transition-[filter] duration-200",
-            profile.paused && "grayscale",
+            "flex min-w-0 flex-1 flex-col transition-[filter,opacity] duration-200",
+            // Keep the paused profile readable while making the whole editor feel inactive.
+            // Opacity prevents dark theme colors from collapsing into near-black after grayscale.
+            profile.paused && "grayscale opacity-70",
           )}
         >
           <EditorToolbar

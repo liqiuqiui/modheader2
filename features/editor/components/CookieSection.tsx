@@ -5,6 +5,7 @@ import { createCookieRule } from "../../../types";
 import type { CookieRule } from "../../../types";
 import { CookieRuleRow } from "./CookieRuleRow";
 import { EmptyState } from "./EmptyState";
+import { SectionContent } from "./SectionContent";
 import { SectionHeader } from "./SectionHeader";
 
 export function CookieSection({
@@ -49,35 +50,33 @@ export function CookieSection({
         }}
         onClear={() => onChange([])}
       />
-      {open && (
-        <div className={clsx(compact ? "space-y-1.5" : "space-y-2")}>
-          {visibleCookies.map((cookie) => (
-            <CookieRuleRow
-              key={cookie.id}
-              cookie={cookie}
-              compact={compact}
-              autoFocus={cookie.id === focusCookieId || cookie.id === localFocusCookieId}
-              onChange={(patch) =>
-                onChange(
-                  cookies.map((item) => (item.id === cookie.id ? { ...item, ...patch } : item)),
-                )
-              }
-              onDelete={() => onChange(cookies.filter((item) => item.id !== cookie.id))}
-              onClone={() => {
-                const clone = { ...cookie, id: createCookieRule().id };
-                setLocalFocusCookieId(clone.id);
-                onChange([...cookies, clone]);
-              }}
-            />
-          ))}
-          {!compact && cookies.length === 0 && (
-            <EmptyState label={t("section.noRules", { title: t("section.cookies") })} />
-          )}
-          {cookies.length > 0 && visibleCookies.length === 0 && (
-            <EmptyState label={t("section.noMatchedRules")} />
-          )}
-        </div>
-      )}
+      <SectionContent open={open} className={clsx(compact ? "space-y-1.5" : "space-y-2")}>
+        {visibleCookies.map((cookie) => (
+          <CookieRuleRow
+            key={cookie.id}
+            cookie={cookie}
+            compact={compact}
+            autoFocus={cookie.id === focusCookieId || cookie.id === localFocusCookieId}
+            onChange={(patch) =>
+              onChange(
+                cookies.map((item) => (item.id === cookie.id ? { ...item, ...patch } : item)),
+              )
+            }
+            onDelete={() => onChange(cookies.filter((item) => item.id !== cookie.id))}
+            onClone={() => {
+              const clone = { ...cookie, id: createCookieRule().id };
+              setLocalFocusCookieId(clone.id);
+              onChange([...cookies, clone]);
+            }}
+          />
+        ))}
+        {!compact && cookies.length === 0 && (
+          <EmptyState label={t("section.noRules", { title: t("section.cookies") })} />
+        )}
+        {cookies.length > 0 && visibleCookies.length === 0 && (
+          <EmptyState label={t("section.noMatchedRules")} />
+        )}
+      </SectionContent>
     </section>
   );
 }

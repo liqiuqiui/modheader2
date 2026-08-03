@@ -17,6 +17,7 @@ import type { FilterKind, FilterMode } from "../types";
 import { EmptyState } from "./EmptyState";
 import { FilterAddPanel } from "./FilterAddPanel";
 import { FilterRow } from "./FilterRow";
+import { SectionContent } from "./SectionContent";
 import { SectionHeader } from "./SectionHeader";
 
 export function FilterSection({
@@ -99,45 +100,43 @@ export function FilterSection({
         addActive={showAddPanel}
         rotateAddIcon
       />
-      {open && (
-        <div className={clsx(compact ? "space-y-1.5" : "space-y-2")}>
-          {showAddPanel && (
-            <FilterAddPanel
-              draftKind={draftKind}
-              draftMode={draftMode}
-              activeTab={currentTab}
-              onKindChange={setDraftKind}
-              onModeChange={setDraftMode}
-              onAdd={() => handleAdd(draftKind, draftMode)}
-              onClose={() => setShowAddPanel(false)}
-            />
-          )}
-          {visibleFilters.map((filter) => (
-            <FilterRow
-              key={filter.id}
-              filter={filter}
-              autoFocusValue={filter.id === focusFilterId || filter.id === localFocusFilterId}
-              tabs={tabs}
-              currentTabId={currentTabId}
-              onPatch={(patch) => onUpdate(updateFilter(profile, filter, patch))}
-              onKindChange={(kind) =>
-                onUpdate(changeFilterKind(profile, tabs, filter, kind, currentTabId))
-              }
-              onDelete={() => onUpdate(withoutFilter(profile, filter.id))}
-              compact={compact}
-            />
-          ))}
-          {!compact && filters.length === 0 && <EmptyState label={t("filter.noFilters")} />}
-          {filters.length > 0 && visibleFilters.length === 0 && (
-            <EmptyState label={t("filter.noMatched")} />
-          )}
-          {!compact && filters.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-slate-100/70 px-4 py-3 text-xs text-slate-500">
-              {t("filter.help")}
-            </div>
-          )}
-        </div>
-      )}
+      <SectionContent open={open} className={clsx(compact ? "space-y-1.5" : "space-y-2")}>
+        {showAddPanel && (
+          <FilterAddPanel
+            draftKind={draftKind}
+            draftMode={draftMode}
+            activeTab={currentTab}
+            onKindChange={setDraftKind}
+            onModeChange={setDraftMode}
+            onAdd={() => handleAdd(draftKind, draftMode)}
+            onClose={() => setShowAddPanel(false)}
+          />
+        )}
+        {visibleFilters.map((filter) => (
+          <FilterRow
+            key={filter.id}
+            filter={filter}
+            autoFocusValue={filter.id === focusFilterId || filter.id === localFocusFilterId}
+            tabs={tabs}
+            currentTabId={currentTabId}
+            onPatch={(patch) => onUpdate(updateFilter(profile, filter, patch))}
+            onKindChange={(kind) =>
+              onUpdate(changeFilterKind(profile, tabs, filter, kind, currentTabId))
+            }
+            onDelete={() => onUpdate(withoutFilter(profile, filter.id))}
+            compact={compact}
+          />
+        ))}
+        {!compact && filters.length === 0 && <EmptyState label={t("filter.noFilters")} />}
+        {filters.length > 0 && visibleFilters.length === 0 && (
+          <EmptyState label={t("filter.noMatched")} />
+        )}
+        {!compact && filters.length > 0 && (
+          <div className="rounded-xl border border-slate-200 bg-slate-100/70 px-4 py-3 text-xs text-slate-500">
+            {t("filter.help")}
+          </div>
+        )}
+      </SectionContent>
     </section>
   );
 }

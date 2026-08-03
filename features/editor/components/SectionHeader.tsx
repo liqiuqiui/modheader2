@@ -1,6 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { clsx } from "clsx";
-import { Check, ChevronDown, ChevronRight, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronRight, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { menuItemClass } from "./styles";
 
@@ -41,7 +41,15 @@ export function SectionHeader({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-2 px-1 py-2">
+    <div
+      className={clsx(
+        "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-[background-color,margin] duration-200 hover:bg-slate-200/70 has-[:focus-visible]:bg-slate-200/70 motion-reduce:transition-none",
+        open && (count > 0 || addExpanded) && "mb-1.5",
+      )}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onToggle();
+      }}
+    >
       <button
         type="button"
         aria-label={
@@ -61,14 +69,17 @@ export function SectionHeader({
       </button>
       <button
         type="button"
+        aria-expanded={open}
         className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
         onClick={onToggle}
       >
-        {open ? (
-          <ChevronDown aria-hidden="true" className="h-4 w-4 text-slate-400" />
-        ) : (
-          <ChevronRight aria-hidden="true" className="h-4 w-4 text-slate-400" />
-        )}
+        <ChevronRight
+          aria-hidden="true"
+          className={clsx(
+            "h-4 w-4 text-slate-400 transition-transform duration-200 motion-reduce:transition-none",
+            open && "rotate-90",
+          )}
+        />
         <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
           {title}
         </span>
