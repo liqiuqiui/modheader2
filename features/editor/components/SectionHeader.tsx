@@ -83,7 +83,9 @@ export function SectionHeader({
         <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
           {title}
         </span>
-        <span className="text-[11px] text-slate-400">· {count}</span>
+        <span className="inline-flex min-w-5 items-center justify-center rounded-full border border-[var(--theme-color)]/25 bg-[var(--theme-color)]/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--theme-color)]">
+          {count}
+        </span>
       </button>
       <button
         type="button"
