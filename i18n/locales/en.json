@@ -90,6 +90,7 @@
     "delete": "Delete header rule",
     "more": "More header settings",
     "addComment": "Add comment",
+    "removeComment": "Remove comment",
     "clone": "Duplicate header rule",
     "convertToResponse": "Convert to response headers",
     "convertToRequest": "Convert to request headers",
@@ -112,6 +113,7 @@
     "ruleLabel": "CSP directive {{directive}}",
     "unnamed": "unnamed",
     "addComment": "Add comment",
+    "removeComment": "Remove comment",
     "clone": "Duplicate directive",
     "comment": "Directive comment",
     "commentPlaceholder": "Add a comment describing this directive…"

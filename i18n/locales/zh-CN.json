@@ -90,6 +90,7 @@
     "delete": "删除 Header 规则",
     "more": "Header 更多设置",
     "addComment": "添加注释",
+    "removeComment": "移除注释",
     "clone": "复制 Header 规则",
     "convertToResponse": "转换为响应头",
     "convertToRequest": "转换为请求头",
@@ -112,6 +113,7 @@
     "ruleLabel": "CSP 指令 {{directive}}",
     "unnamed": "未命名",
     "addComment": "添加注释",
+    "removeComment": "移除注释",
     "clone": "复制 CSP 指令",
     "comment": "CSP 指令注释",
     "commentPlaceholder": "添加注释，说明这条指令的用途…"

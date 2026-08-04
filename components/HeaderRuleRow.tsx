@@ -8,6 +8,7 @@ import {
   EyeOff,
   GripVertical,
   MessageSquarePlus,
+  MessageSquareX,
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
@@ -161,12 +162,21 @@ export function HeaderRuleRow({
               <DropdownMenu.Item
                 className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs outline-none transition hover:bg-slate-100 focus:bg-slate-100"
                 onSelect={() => {
+                  if (showComment) {
+                    setShowComment(false);
+                    onChange({ comment: "" });
+                    return;
+                  }
                   setShowComment(true);
                   window.setTimeout(() => commentRef.current?.focus(), 0);
                 }}
               >
-                <MessageSquarePlus aria-hidden="true" className="h-3.5 w-3.5" />{" "}
-                {t("header.addComment")}
+                {showComment ? (
+                  <MessageSquareX aria-hidden="true" className="h-3.5 w-3.5" />
+                ) : (
+                  <MessageSquarePlus aria-hidden="true" className="h-3.5 w-3.5" />
+                )}{" "}
+                {t(showComment ? "header.removeComment" : "header.addComment")}
               </DropdownMenu.Item>
               {onClone && (
                 <DropdownMenu.Item
