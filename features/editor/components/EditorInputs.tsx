@@ -1,14 +1,11 @@
 import type { RefObject } from "react";
-import type { Profile } from "../../../types";
 
 export function EditorInputs({
-  profile,
   fileInputRef,
   colorInputRef,
   onImport,
   onColorChange,
 }: {
-  profile: Profile;
   fileInputRef: RefObject<HTMLInputElement | null>;
   colorInputRef: RefObject<HTMLInputElement | null>;
   onImport: (file?: File) => void;
@@ -26,7 +23,7 @@ export function EditorInputs({
       <input
         ref={colorInputRef}
         type="color"
-        value={profile.backgroundColor}
+        defaultValue="#000000"
         className="sr-only"
         onChange={(event) => onColorChange(event.target.value)}
       />

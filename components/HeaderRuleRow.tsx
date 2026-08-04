@@ -11,7 +11,7 @@ import {
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
-import type { HeaderRule, AppendMode } from "../types";
+import type { AppendMode, HeaderRule } from "../modules/profile/domain/profile-model";
 import { Switch } from "./ui/switch";
 import { Input } from "./ui/input";
 import { useTranslation } from "react-i18next";

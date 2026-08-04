@@ -1,21 +1,19 @@
 import { useTranslation } from "react-i18next";
 import { Switch } from "../../../components/ui/switch";
-import type { Profile } from "../../../types";
-import { profileFilters } from "../filterModel";
+import { selectSelectedProfile } from "../../../modules/profile/state/profile-selectors";
+import { useProfileStore } from "../../../modules/profile/state/profile-store";
 
-export function ProfileStatusCard({
-  profile,
-  onEnabledChange,
-}: {
-  profile: Profile;
-  onEnabledChange: (enabled: boolean) => void;
-}) {
+export function ProfileStatusCard() {
   const { t } = useTranslation();
+  const profile = useProfileStore(selectSelectedProfile);
+  const patchProfile = useProfileStore((state) => state.patchProfile);
+  if (!profile) return null;
+
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <Switch
         checked={profile.enabled}
-        onCheckedChange={onEnabledChange}
+        onCheckedChange={(enabled) => void patchProfile(profile.id, { enabled })}
         aria-label={profile.enabled ? t("common.enabled") : t("common.disabled")}
       />
       <div className="min-w-0 flex-1">
@@ -35,7 +33,7 @@ export function ProfileStatusCard({
           })}
         </span>
         <span className="rounded-full bg-slate-100 px-2 py-1">
-          {t("filter.count", { count: profileFilters(profile).length })}
+          {t("filter.count", { count: profile.filters.order.length })}
         </span>
       </div>
     </div>

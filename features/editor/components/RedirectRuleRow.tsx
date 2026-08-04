@@ -2,7 +2,7 @@ import { clsx } from "clsx";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../../../components/ui/switch";
-import type { UrlReplacement } from "../../../types";
+import type { UrlReplacement } from "../../../modules/profile/domain/profile-model";
 
 export function RedirectRuleRow({
   replacement,

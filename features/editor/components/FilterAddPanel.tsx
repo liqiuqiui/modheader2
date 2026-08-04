@@ -1,9 +1,14 @@
 import { clsx } from "clsx";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import {
+  FILTER_KINDS,
+  FILTER_MODES,
+  type FilterKind,
+  type FilterMode,
+} from "../../../modules/profile/domain/profile-model";
 import type { BrowserTab } from "../../../types/browser";
 import { FILTER_LABEL_KEYS } from "../constants";
-import type { FilterKind, FilterMode } from "../types";
 
 export function FilterAddPanel({
   draftKind,
@@ -44,7 +49,7 @@ export function FilterAddPanel({
       </div>
 
       <div role="tablist" aria-label={t("filter.chooseType")} className="mt-4 flex flex-wrap gap-2">
-        {(Object.keys(FILTER_LABEL_KEYS) as FilterKind[]).map((kind) => {
+        {FILTER_KINDS.map((kind) => {
           const selected = draftKind === kind;
           return (
             <button
@@ -71,7 +76,7 @@ export function FilterAddPanel({
           className="inline-flex rounded-lg border border-slate-200 bg-white p-1"
           aria-label={t("filter.modeLabel")}
         >
-          {(["include", "exclude"] as FilterMode[]).map((mode) => (
+          {FILTER_MODES.map((mode) => (
             <button
               type="button"
               key={mode}

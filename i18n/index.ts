@@ -1,7 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { defaultLocale, supportedLocales } from "../config/locales";
-import { bindDocumentLanguage } from "../utils/document-language";
+import { bindDocumentLanguage } from "./document-language";
 import { storageLanguageDetector, watchStoredLocale } from "./language-detector";
 import { resources } from "./resources";
 

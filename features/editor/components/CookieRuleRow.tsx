@@ -3,7 +3,7 @@ import { clsx } from "clsx";
 import { Copy, MoreHorizontal, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../../../components/ui/switch";
-import type { CookieRule } from "../../../types";
+import type { CookieRule } from "../../../modules/profile/domain/profile-model";
 import { menuItemClass } from "./styles";
 
 export function CookieRuleRow({

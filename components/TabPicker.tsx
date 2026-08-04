@@ -23,10 +23,10 @@ export function TabPicker({
   onChange,
   compact = false,
 }: {
-  value: number | string;
+  value: number | null;
   tabs: BrowserTab[];
   currentTabId?: number;
-  onChange: (tabId: number | string) => void;
+  onChange: (tabId: number) => void;
   compact?: boolean;
 }) {
   const { t } = useTranslation();
@@ -34,10 +34,9 @@ export function TabPicker({
   const [query, setQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const portalContainer = useThemePortalContainer();
-  const numericValue = Number(value);
-  const selected = tabs.find((tab) => tab.id === numericValue);
+  const selected = value === null ? undefined : tabs.find((tab) => tab.id === value);
   const currentTab = tabs.find((tab) => tab.id === currentTabId);
-  const isClosedTab = value !== "" && !selected;
+  const isClosedTab = value !== null && !selected;
   const canUseCurrentTab = isClosedTab && currentTab?.id !== undefined;
 
   const filteredTabs = useMemo(() => {
@@ -49,7 +48,7 @@ export function TabPicker({
   }, [query, tabs]);
 
   const label =
-    selected?.title?.trim() || (value !== "" ? t("tab.closed", { id: value }) : t("tab.select"));
+    selected?.title?.trim() || (value !== null ? t("tab.closed", { id: value }) : t("tab.select"));
   const host = selected ? getHost(selected.url) : "";
 
   return (
@@ -143,7 +142,7 @@ export function TabPicker({
               </div>
             ) : (
               filteredTabs.map((tab) => {
-                const isSelected = tab.id === numericValue;
+                const isSelected = tab.id === value;
                 const isCurrent = tab.id === currentTabId;
                 return (
                   <button

@@ -5,29 +5,22 @@ import { useTranslation } from "react-i18next";
 import {
   createCookieRule,
   createHeaderRule,
-  createUrlFilter,
   createUrlReplacement,
-} from "../../../types";
-import type { Profile } from "../../../types";
+} from "../../../modules/profile/domain/profile-factory";
+import { createProfileFilter } from "../../../modules/profile/domain/profile-filter";
+import { useProfileStore } from "../../../modules/profile/state/profile-store";
+import { useEditorUiStore } from "../stores/editor-ui-store";
 import type { EditorMode } from "../types";
 import { menuItemClass } from "./styles";
 
-export function QuickAddActions({
-  mode,
-  profile,
-  onUpdate,
-  onFocusHeader,
-  onFocusCookie,
-  onFocusFilter,
-}: {
-  mode: EditorMode;
-  profile: Profile;
-  onUpdate: (patch: Partial<Profile>) => void;
-  onFocusHeader: (id: string) => void;
-  onFocusCookie: (id: string) => void;
-  onFocusFilter: (id: string) => void;
-}) {
+export function QuickAddActions({ mode }: { mode: EditorMode }) {
   const { t } = useTranslation();
+  const profileId = useProfileStore((state) => state.selectedProfileId);
+  const addRule = useProfileStore((state) => state.addRule);
+  const addFilter = useProfileStore((state) => state.addFilter);
+  const requestFocus = useEditorUiStore((state) => state.requestFocus);
+  if (!profileId) return null;
+
   return (
     <div
       className={clsx(
@@ -58,8 +51,8 @@ export function QuickAddActions({
               className={menuItemClass}
               onSelect={() => {
                 const nextRule = createHeaderRule();
-                onFocusHeader(nextRule.id);
-                onUpdate({ headers: [...profile.headers, nextRule] });
+                requestFocus("header", nextRule.id);
+                void addRule(profileId, "headers", nextRule);
               }}
             >
               {t("section.requestHeaders")}
@@ -68,8 +61,8 @@ export function QuickAddActions({
               className={menuItemClass}
               onSelect={() => {
                 const nextRule = createHeaderRule();
-                onFocusHeader(nextRule.id);
-                onUpdate({ respHeaders: [...profile.respHeaders, nextRule] });
+                requestFocus("header", nextRule.id);
+                void addRule(profileId, "respHeaders", nextRule);
               }}
             >
               {t("section.responseHeaders")}
@@ -78,19 +71,15 @@ export function QuickAddActions({
               className={menuItemClass}
               onSelect={() => {
                 const cookie = createCookieRule();
-                onFocusCookie(cookie.id);
-                onUpdate({ cookies: [...profile.cookies, cookie] });
+                requestFocus("cookie", cookie.id);
+                void addRule(profileId, "cookies", cookie);
               }}
             >
               {t("mod.cookies")}
             </DropdownMenu.Item>
             <DropdownMenu.Item
               className={menuItemClass}
-              onSelect={() =>
-                onUpdate({
-                  urlReplacements: [...profile.urlReplacements, createUrlReplacement()],
-                })
-              }
+              onSelect={() => void addRule(profileId, "urlReplacements", createUrlReplacement())}
             >
               {t("section.urlRedirects")}
             </DropdownMenu.Item>
@@ -98,8 +87,8 @@ export function QuickAddActions({
               className={menuItemClass}
               onSelect={() => {
                 const nextRule = createHeaderRule({ name: "Content-Security-Policy" });
-                onFocusHeader(nextRule.id);
-                onUpdate({ respHeaders: [...profile.respHeaders, nextRule] });
+                requestFocus("header", nextRule.id);
+                void addRule(profileId, "respHeaders", nextRule);
               }}
             >
               {t("mod.csp")}
@@ -110,9 +99,9 @@ export function QuickAddActions({
       <button
         type="button"
         onClick={() => {
-          const nextFilter = createUrlFilter({ matchType: "pattern" });
-          onFocusFilter(nextFilter.id);
-          onUpdate({ urlFilters: [...profile.urlFilters, nextFilter] });
+          const nextFilter = createProfileFilter({ kind: "urlPattern", mode: "include" });
+          requestFocus("filter", nextFilter.id);
+          void addFilter(profileId, nextFilter);
         }}
         className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)]"
       >

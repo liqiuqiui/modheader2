@@ -1,75 +1,173 @@
+import { nanoid } from "nanoid";
 import { defineBackground } from "wxt/utils/define-background";
-import { profilesStorage, selectedIndexStorage } from "../store";
-import { profilesToDnrRules, applyDnrRules } from "../utils/dnr";
 import i18n, { initializeI18n } from "../i18n";
-import { localeStorage } from "../store/locale";
+import { localeStorage } from "../i18n/locale-storage";
+import type { ProfileCommand } from "../modules/profile/application/profile-command";
+import {
+  isProfileCommandRevisionConflict,
+  reduceProfileCommand,
+} from "../modules/profile/application/reduce-profile-command";
+import {
+  applyDnrRules,
+  compileProfileDnrRules,
+} from "../modules/profile/infrastructure/profile-dnr";
+import {
+  isProfileCommandMessage,
+  type ProfileCommandResponse,
+} from "../modules/profile/infrastructure/profile-command-protocol";
+import {
+  profileStateStorage,
+  readStoredProfileDocument,
+  type ProfileDocument,
+  writeStoredProfileDocument,
+} from "../modules/profile/infrastructure/profile-storage";
+
+const CONTEXT_MENU_ID = "toggle_pause";
+const BACKGROUND_SOURCE_ID = nanoid();
+
+let documentMutationQueue: Promise<void> = Promise.resolve();
+
+function selectedProfile(document: ProfileDocument) {
+  if (!document.selectedProfileId) return undefined;
+  return document.profilesById[document.selectedProfileId];
+}
 
 async function syncRules() {
-  const [profiles, selectedIndex] = await Promise.all([
-    profilesStorage.getValue(),
-    selectedIndexStorage.getValue(),
-  ]);
+  const profile = selectedProfile(await readStoredProfileDocument());
+  const compilation = compileProfileDnrRules(profile);
+  if (compilation.diagnostics.length > 0) {
+    console.warn(
+      `Profile DNR compilation failed for ${profile?.id ?? "no selected profile"}: ${compilation.diagnostics.join("; ")}`,
+    );
+  }
+  await applyDnrRules(compilation.rules);
+}
 
-  const rules = profilesToDnrRules(profiles, selectedIndex);
-  await applyDnrRules(rules);
+async function syncContextMenu() {
+  await initializeI18n();
+  const [locale, document] = await Promise.all([
+    localeStorage.getValue(),
+    readStoredProfileDocument(),
+  ]);
+  const profile = selectedProfile(document);
+  const t = i18n.getFixedT(locale);
+  await browser.contextMenus.update(CONTEXT_MENU_ID, {
+    title: t(profile?.paused ? "context.resume" : "context.pause"),
+  });
+}
+
+function latestTask(task: () => Promise<void>) {
+  let requested = false;
+  let running = false;
+
+  const run = async () => {
+    if (running) return;
+    running = true;
+    try {
+      while (requested) {
+        requested = false;
+        await task();
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      running = false;
+      if (requested) void run();
+    }
+  };
+
+  return () => {
+    requested = true;
+    void run();
+  };
+}
+
+const scheduleRulesSync = latestTask(syncRules);
+const scheduleContextMenuSync = latestTask(syncContextMenu);
+
+function enqueueDocumentTask<T>(task: () => Promise<T>): Promise<T> {
+  const result = documentMutationQueue.then(task);
+  documentMutationQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+function executeProfileCommand(
+  command: ProfileCommand,
+  sourceId: string,
+): Promise<ProfileDocument> {
+  return enqueueDocumentTask(async () => {
+    const current = await readStoredProfileDocument();
+    const result = reduceProfileCommand(current, command, sourceId);
+    if (isProfileCommandRevisionConflict(result)) {
+      throw new Error(
+        `Profile state changed in another window (expected revision ${result.expected}, current revision ${result.actual}).`,
+      );
+    }
+    if (result.status === "applied") await writeStoredProfileDocument(result.document);
+    return result.document;
+  });
+}
+
+async function handleProfileCommand(
+  command: ProfileCommand,
+  sourceId: string,
+): Promise<ProfileCommandResponse> {
+  try {
+    return { ok: true, document: await executeProfileCommand(command, sourceId) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function createContextMenu() {
+  await initializeI18n();
+  try {
+    await browser.contextMenus.remove(CONTEXT_MENU_ID);
+  } catch {
+    // The menu does not exist on the first run.
+  }
+  const locale = await localeStorage.getValue();
+  const profile = selectedProfile(await readStoredProfileDocument());
+  const t = i18n.getFixedT(locale);
+  browser.contextMenus.create({
+    id: CONTEXT_MENU_ID,
+    title: t(profile?.paused ? "context.resume" : "context.pause"),
+    contexts: ["action"],
+  });
 }
 
 export default defineBackground(() => {
-  // 初始化时同步规则
-  syncRules();
+  scheduleRulesSync();
+  void createContextMenu().then(scheduleContextMenuSync).catch(console.error);
 
-  // 监听 storage 变化，重新应用规则
-  profilesStorage.watch(() => syncRules());
-  selectedIndexStorage.watch(() => syncRules());
+  profileStateStorage.watch(() => {
+    scheduleRulesSync();
+    scheduleContextMenuSync();
+  });
+  localeStorage.watch(scheduleContextMenuSync);
 
-  const syncContextMenu = async () => {
-    await initializeI18n();
-    const [locale, profiles, selectedIndex] = await Promise.all([
-      localeStorage.getValue(),
-      profilesStorage.getValue(),
-      selectedIndexStorage.getValue(),
-    ]);
-    const t = i18n.getFixedT(locale);
-    const paused = profiles[selectedIndex]?.paused ?? false;
-    await browser.contextMenus.update("toggle_pause", {
-      title: t(paused ? "context.resume" : "context.pause"),
-    });
-  };
+  browser.runtime.onMessage.addListener((message) => {
+    if (!isProfileCommandMessage(message)) return undefined;
+    return handleProfileCommand(message.command, message.clientId);
+  });
 
-  const createContextMenu = async () => {
-    await initializeI18n();
-    const [locale, profiles, selectedIndex] = await Promise.all([
-      localeStorage.getValue(),
-      profilesStorage.getValue(),
-      selectedIndexStorage.getValue(),
-    ]);
-    const t = i18n.getFixedT(locale);
-    const paused = profiles[selectedIndex]?.paused ?? false;
-    browser.contextMenus.create({
-      id: "toggle_pause",
-      title: t(paused ? "context.resume" : "context.pause"),
-      contexts: ["action"],
-    });
-  };
-
-  void createContextMenu();
-  localeStorage.watch(() => void syncContextMenu());
-  profilesStorage.watch(() => void syncContextMenu());
-  selectedIndexStorage.watch(() => void syncContextMenu());
-
-  browser.contextMenus.onClicked.addListener(async (info) => {
-    if (info.menuItemId === "toggle_pause") {
-      const [profiles, selectedIndex] = await Promise.all([
-        profilesStorage.getValue(),
-        selectedIndexStorage.getValue(),
-      ]);
-      if (!profiles[selectedIndex]) return;
-      await profilesStorage.setValue(
-        profiles.map((profile, index) =>
-          index === selectedIndex ? { ...profile, paused: !profile.paused } : profile,
-        ),
+  browser.contextMenus.onClicked.addListener((info) => {
+    if (info.menuItemId !== CONTEXT_MENU_ID) return;
+    void enqueueDocumentTask(async () => {
+      const current = await readStoredProfileDocument();
+      const profileId = current.selectedProfileId;
+      if (!profileId) return;
+      const profile = current.profilesById[profileId];
+      if (!profile) return;
+      const result = reduceProfileCommand(
+        current,
+        { type: "patchProfile", profileId, patch: { paused: !profile.paused } },
+        BACKGROUND_SOURCE_ID,
       );
-      await syncContextMenu();
-    }
+      if (result.status === "applied") await writeStoredProfileDocument(result.document);
+    }).catch(console.error);
   });
 });

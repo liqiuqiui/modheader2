@@ -1,6 +1,6 @@
 import type { i18n as I18nInstance, LanguageDetectorAsyncModule } from "i18next";
 import { defaultLocale, isSupportedLocale } from "../config/locales";
-import { localeStorage } from "../store/locale";
+import { localeStorage } from "./locale-storage";
 
 export const storageLanguageDetector: LanguageDetectorAsyncModule = {
   type: "languageDetector",

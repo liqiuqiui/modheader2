@@ -3,9 +3,15 @@ import { useSortable } from "@dnd-kit/react/sortable";
 import { GripVertical, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../../../components/ui/switch";
+import {
+  FILTER_KINDS,
+  FILTER_MODES,
+  type FilterKind,
+  type ProfileFilter,
+  type ProfileFilterPatch,
+} from "../../../modules/profile/domain/profile-model";
 import type { BrowserTab } from "../../../types/browser";
 import { FILTER_LABEL_KEYS } from "../constants";
-import type { FilterKind, FilterMode, FilterView } from "../types";
 import { FilterSelect } from "./FilterSelect";
 import { FilterValueEditor } from "./FilterValueEditor";
 
@@ -21,10 +27,10 @@ export function FilterRow({
   sortableDisabled = false,
   compact = false,
 }: {
-  filter: FilterView;
+  filter: ProfileFilter;
   tabs: BrowserTab[];
   currentTabId?: number;
-  onPatch: (patch: Partial<FilterView>) => void;
+  onPatch: (patch: ProfileFilterPatch) => void;
   onKindChange: (kind: FilterKind) => void;
   onDelete: () => void;
   autoFocusValue?: boolean;
@@ -68,19 +74,19 @@ export function FilterRow({
         <FilterSelect
           ariaLabel={t("filter.modeLabel")}
           value={filter.mode}
-          onValueChange={(value) => onPatch({ mode: value as FilterMode })}
+          onValueChange={(mode) => onPatch({ mode })}
           className={clsx("shrink-0 font-medium", isEnglish ? "w-24" : "w-[84px]")}
-          options={[
-            { value: "include", label: t("filter.include") },
-            { value: "exclude", label: t("filter.exclude") },
-          ]}
+          options={FILTER_MODES.map((mode) => ({
+            value: mode,
+            label: t(mode === "include" ? "filter.include" : "filter.exclude"),
+          }))}
         />
         <FilterSelect
           ariaLabel={t("filter.typeLabel")}
           value={filter.kind}
-          onValueChange={(value) => onKindChange(value as FilterKind)}
+          onValueChange={onKindChange}
           className={clsx("shrink-0", isEnglish ? "w-36" : "w-[122px]")}
-          options={(Object.keys(FILTER_LABEL_KEYS) as FilterKind[]).map((kind) => ({
+          options={FILTER_KINDS.map((kind) => ({
             value: kind,
             label: t(FILTER_LABEL_KEYS[kind]),
           }))}

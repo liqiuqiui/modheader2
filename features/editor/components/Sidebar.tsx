@@ -12,7 +12,11 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { Profile } from "../../../types";
+import { useShallow } from "zustand/react/shallow";
+import type { Profile } from "../../../modules/profile/domain/profile-model";
+import { selectOrderedProfiles } from "../../../modules/profile/state/profile-selectors";
+import { useProfileStore } from "../../../modules/profile/state/profile-store";
+import { useEditorUiStore } from "../stores/editor-ui-store";
 import type { EditorMode } from "../types";
 
 function SortableProfileItem({
@@ -26,7 +30,7 @@ function SortableProfileItem({
   profile: Profile;
   index: number;
   selected: boolean;
-  onSelect: (index: number) => void;
+  onSelect: (profileId: string) => void;
 }) {
   const { ref, isDragging } = useSortable({ id: profile.id, index });
 
@@ -34,7 +38,7 @@ function SortableProfileItem({
     <button
       ref={ref}
       type="button"
-      onClick={() => onSelect(index)}
+      onClick={() => onSelect(profile.id)}
       title={collapsed ? profile.title : undefined}
       className={clsx(
         "flex w-full cursor-grab touch-none items-center gap-2 rounded-lg p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] active:cursor-grabbing",
@@ -62,39 +66,32 @@ function SortableProfileItem({
   );
 }
 
-export function Sidebar({
-  mode,
-  collapsed,
-  profiles,
-  selectedIndex,
-  searchQuery,
-  onCollapsedChange,
-  onSearchChange,
-  onSelect,
-  onReorder,
-  onImport,
-  onSort,
-}: {
-  mode: EditorMode;
-  collapsed: boolean;
-  profiles: Profile[];
-  selectedIndex: number;
-  searchQuery: string;
-  onCollapsedChange: (collapsed: boolean) => void;
-  onSearchChange: (query: string) => void;
-  onSelect: (index: number) => void;
-  onReorder: (fromIndex: number, toIndex: number) => void;
-  onImport: () => void;
-  onSort: () => void;
-}) {
+export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => void }) {
   const { t } = useTranslation();
+  const profiles = useProfileStore(useShallow(selectOrderedProfiles));
+  const selectedProfileId = useProfileStore((state) => state.selectedProfileId);
+  const selectProfile = useProfileStore((state) => state.selectProfile);
+  const reorderProfiles = useProfileStore((state) => state.reorderProfiles);
+  const sortProfileRules = useProfileStore((state) => state.sortProfileRules);
+  const collapsed = useEditorUiStore((state) => state.collapsed);
+  const searchQuery = useEditorUiStore((state) => state.searchQuery);
+  const setCollapsed = useEditorUiStore((state) => state.setCollapsed);
+  const setSearchQuery = useEditorUiStore((state) => state.setSearchQuery);
+  const showNotice = useEditorUiStore((state) => state.showNotice);
 
   const handleDragEnd = (event: DragEndEvent) => {
     if (event.canceled || !isSortableOperation(event.operation)) return;
     const { source, target } = event.operation;
     if (!source || !target) return;
     if (source.sortable.index === target.sortable.index) return;
-    onReorder(source.sortable.index, target.sortable.index);
+    void reorderProfiles(source.sortable.index, target.sortable.index);
+  };
+
+  const handleSort = () => {
+    if (!selectedProfileId) return;
+    void sortProfileRules(selectedProfileId).then((saved) => {
+      if (saved) showNotice(t("sort.success"));
+    });
   };
 
   return (
@@ -114,7 +111,7 @@ export function Sidebar({
         <button
           type="button"
           aria-label={collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
-          onClick={() => onCollapsedChange(!collapsed)}
+          onClick={() => setCollapsed(!collapsed)}
           className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
         >
           {collapsed ? (
@@ -133,7 +130,7 @@ export function Sidebar({
           <button
             type="button"
             aria-label={t("nav.searchRules")}
-            onClick={() => onCollapsedChange(false)}
+            onClick={() => setCollapsed(false)}
             className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
           >
             <Search aria-hidden="true" className="h-4 w-4" />
@@ -143,7 +140,7 @@ export function Sidebar({
             <Search aria-hidden="true" className="h-4 w-4 text-slate-400" />
             <input
               value={searchQuery}
-              onChange={(event) => onSearchChange(event.target.value)}
+              onChange={(event) => setSearchQuery(event.target.value)}
               placeholder={t("nav.searchRules")}
               className="min-w-0 flex-1 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
             />
@@ -151,7 +148,7 @@ export function Sidebar({
               <button
                 type="button"
                 aria-label={t("tab.clearSearch")}
-                onClick={() => onSearchChange("")}
+                onClick={() => setSearchQuery("")}
               >
                 <X aria-hidden="true" className="h-3.5 w-3.5 text-slate-400" />
               </button>
@@ -174,8 +171,8 @@ export function Sidebar({
                 collapsed={collapsed}
                 profile={profile}
                 index={index}
-                selected={index === selectedIndex}
-                onSelect={onSelect}
+                selected={profile.id === selectedProfileId}
+                onSelect={(profileId) => void selectProfile(profileId)}
               />
             ))}
           </div>
@@ -195,7 +192,7 @@ export function Sidebar({
               type="button"
               aria-label={t("nav.sortRules")}
               title={t("nav.sortRules")}
-              onClick={onSort}
+              onClick={handleSort}
               className="flex h-10 w-full items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
             >
               <ArrowUpDown aria-hidden="true" className="h-4 w-4" />
@@ -214,7 +211,7 @@ export function Sidebar({
             </button>
             <button
               type="button"
-              onClick={onSort}
+              onClick={handleSort}
               className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-xs text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
             >
               <ArrowUpDown aria-hidden="true" className="h-4 w-4" /> {t("nav.sortRules")}

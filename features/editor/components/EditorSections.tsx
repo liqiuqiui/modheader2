@@ -1,75 +1,72 @@
+import { useEffect } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
-import type { HeaderRule, Profile } from "../../../types";
-import type { BrowserTab } from "../../../types/browser";
+import { selectSelectedProfile } from "../../../modules/profile/state/profile-selectors";
+import { useProfileStore } from "../../../modules/profile/state/profile-store";
+import { useBrowserTabsStore } from "../stores/browser-tabs-store";
+import { useEditorUiStore } from "../stores/editor-ui-store";
 import type { EditorMode } from "../types";
 import { CookieSection } from "./CookieSection";
 import { FilterSection } from "./FilterSection";
 import { HeaderSection } from "./HeaderSection";
 import { RedirectSection } from "./RedirectSection";
 
-export function EditorSections({
-  mode,
-  profile,
-  tabs,
-  currentTabId,
-  searchQuery,
-  focusHeaderId,
-  focusCookieId,
-  focusFilterId,
-  onUpdate,
-  onConvertHeader,
-}: {
-  mode: EditorMode;
-  profile: Profile;
-  tabs: BrowserTab[];
-  currentTabId?: number;
-  searchQuery: string;
-  focusHeaderId?: string | null;
-  focusCookieId?: string | null;
-  focusFilterId?: string | null;
-  onUpdate: (patch: Partial<Profile>) => void;
-  onConvertHeader: (rule: HeaderRule, target: "request" | "response") => void;
-}) {
+export function EditorSections({ mode }: { mode: EditorMode }) {
   const { t } = useTranslation();
+  const profile = useProfileStore(selectSelectedProfile);
+  const tabs = useBrowserTabsStore((state) => state.tabs);
+  const currentTabId = useBrowserTabsStore((state) => state.currentTabId);
+  const searchQuery = useEditorUiStore((state) => state.searchQuery);
+  const focusRequest = useEditorUiStore((state) => state.focusRequest);
+  const clearFocusRequest = useEditorUiStore((state) => state.clearFocusRequest);
   const compact = mode === "popup";
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    const frame = window.requestAnimationFrame(clearFocusRequest);
+    return () => window.cancelAnimationFrame(frame);
+  }, [clearFocusRequest, focusRequest]);
+
+  if (!profile) return null;
+
   return (
     <div className={clsx(compact ? "space-y-2.5" : "space-y-4")}>
       <HeaderSection
+        profileId={profile.id}
         title={t("section.requestHeaders")}
+        collection="headers"
         rules={profile.headers}
         searchQuery={searchQuery}
-        focusRuleId={focusHeaderId}
+        focusRuleId={focusRequest?.kind === "header" ? focusRequest.id : null}
         convertLabel={t("header.convertToResponse")}
-        onConvertRule={(rule) => onConvertHeader(rule, "response")}
-        onChange={(headers) => onUpdate({ headers })}
         compact={compact}
       />
       {profile.cookies.length > 0 && (
         <CookieSection
+          profileId={profile.id}
           cookies={profile.cookies}
           searchQuery={searchQuery}
-          focusCookieId={focusCookieId}
-          onChange={(cookies) => onUpdate({ cookies })}
+          focusCookieId={focusRequest?.kind === "cookie" ? focusRequest.id : null}
           compact={compact}
         />
       )}
       {profile.respHeaders.length > 0 && (
         <HeaderSection
+          profileId={profile.id}
           title={t("section.responseHeaders")}
+          collection="respHeaders"
           rules={profile.respHeaders}
           searchQuery={searchQuery}
+          focusRuleId={focusRequest?.kind === "header" ? focusRequest.id : null}
           convertLabel={t("header.convertToRequest")}
-          onConvertRule={(rule) => onConvertHeader(rule, "request")}
-          onChange={(respHeaders) => onUpdate({ respHeaders })}
           compact={compact}
         />
       )}
       {profile.urlReplacements.length > 0 && (
         <RedirectSection
+          profileId={profile.id}
           replacements={profile.urlReplacements}
           searchQuery={searchQuery}
-          onChange={(urlReplacements) => onUpdate({ urlReplacements })}
         />
       )}
       <FilterSection
@@ -77,8 +74,7 @@ export function EditorSections({
         tabs={tabs}
         currentTabId={currentTabId}
         searchQuery={searchQuery}
-        focusFilterId={focusFilterId}
-        onUpdate={onUpdate}
+        focusFilterId={focusRequest?.kind === "filter" ? focusRequest.id : null}
         compact={compact}
       />
     </div>

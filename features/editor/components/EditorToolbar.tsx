@@ -1,59 +1,72 @@
+import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 import { FileUp, Maximize2, Pause, Play, Plus, Redo2, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { Profile } from "../../../types";
+import { useShallow } from "zustand/react/shallow";
+import { useProfileStore } from "../../../modules/profile/state/profile-store";
+import { useEditorUiStore } from "../stores/editor-ui-store";
 import { LanguageMenu } from "./LanguageMenu";
 import { ProfileMenu } from "./ProfileMenu";
 import { iconButtonClass } from "./styles";
 
 export function EditorToolbar({
-  profile,
-  profileNumber,
-  titleDraft,
   titleRef,
   locale,
-  canUndo,
-  canRedo,
-  onTitleDraftChange,
-  onTitleCommit,
-  onUndo,
-  onRedo,
-  onAddProfile,
-  onTogglePause,
   onExport,
   onOpenOptions,
   onLanguageChange,
   onRequestRename,
-  onClone,
   onPickColor,
   onCopy,
   onDelete,
   onProfileMenuCloseAutoFocus,
 }: {
-  profile: Profile;
-  profileNumber: number;
-  titleDraft: string;
   titleRef: RefObject<HTMLInputElement | null>;
   locale: "en" | "zh-CN";
-  canUndo: boolean;
-  canRedo: boolean;
-  onTitleDraftChange: (title: string) => void;
-  onTitleCommit: (title: string) => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  onAddProfile: () => void;
-  onTogglePause: () => void;
   onExport: () => void;
   onOpenOptions: () => void;
   onLanguageChange: (locale: "en" | "zh-CN") => void;
   onRequestRename: () => void;
-  onClone: () => void;
   onPickColor: () => void;
   onCopy: () => void;
   onDelete: () => void;
   onProfileMenuCloseAutoFocus: (event: Event) => void;
 }) {
   const { t } = useTranslation();
+  const profile = useProfileStore(
+    useShallow((state) => {
+      const selected = state.selectedProfileId
+        ? state.profilesById[state.selectedProfileId]
+        : undefined;
+      if (!selected) return null;
+      return {
+        id: selected.id,
+        title: selected.title,
+        backgroundColor: selected.backgroundColor,
+        textColor: selected.textColor,
+        paused: selected.paused,
+      };
+    }),
+  );
+  const profileNumber = useProfileStore((state) =>
+    state.selectedProfileId ? state.profileOrder.indexOf(state.selectedProfileId) + 1 : 0,
+  );
+  const canUndo = useProfileStore((state) => state.past.length > 0);
+  const canRedo = useProfileStore((state) => state.future.length > 0);
+  const patchProfile = useProfileStore((state) => state.patchProfile);
+  const undo = useProfileStore((state) => state.undo);
+  const redo = useProfileStore((state) => state.redo);
+  const addProfile = useProfileStore((state) => state.addProfile);
+  const cloneProfile = useProfileStore((state) => state.cloneProfile);
+  const showNotice = useEditorUiStore((state) => state.showNotice);
+  const [titleDraft, setTitleDraft] = useState(profile?.title ?? "");
+
+  useEffect(() => {
+    setTitleDraft(profile?.title ?? "");
+  }, [profile?.id, profile?.title]);
+
+  if (!profile) return null;
+
   return (
     <header
       className="flex h-14 shrink-0 items-center gap-2 px-4 shadow-sm"
@@ -65,8 +78,11 @@ export function EditorToolbar({
       <input
         ref={titleRef}
         value={titleDraft}
-        onChange={(event) => onTitleDraftChange(event.target.value)}
-        onBlur={(event) => onTitleCommit(event.currentTarget.value)}
+        onChange={(event) => setTitleDraft(event.target.value)}
+        onBlur={(event) => {
+          const title = event.currentTarget.value;
+          if (title !== profile.title) void patchProfile(profile.id, { title });
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter") event.currentTarget.blur();
         }}
@@ -84,7 +100,7 @@ export function EditorToolbar({
           title={t("toolbar.undo")}
           aria-label={t("toolbar.undo")}
           disabled={!canUndo}
-          onClick={onUndo}
+          onClick={() => void undo()}
           className={iconButtonClass(!canUndo)}
         >
           <Undo2 aria-hidden="true" className="h-4 w-4" />
@@ -94,7 +110,7 @@ export function EditorToolbar({
           title={t("toolbar.redo")}
           aria-label={t("toolbar.redo")}
           disabled={!canRedo}
-          onClick={onRedo}
+          onClick={() => void redo()}
           className={iconButtonClass(!canRedo)}
         >
           <Redo2 aria-hidden="true" className="h-4 w-4" />
@@ -103,7 +119,7 @@ export function EditorToolbar({
           type="button"
           title={t("toolbar.newProfile")}
           aria-label={t("toolbar.newProfile")}
-          onClick={onAddProfile}
+          onClick={() => void addProfile(locale)}
           className={iconButtonClass()}
         >
           <Plus aria-hidden="true" className="h-4 w-4" />
@@ -112,7 +128,7 @@ export function EditorToolbar({
           type="button"
           title={profile.paused ? t("toolbar.resume") : t("toolbar.pause")}
           aria-label={profile.paused ? t("toolbar.resume") : t("toolbar.pause")}
-          onClick={onTogglePause}
+          onClick={() => void patchProfile(profile.id, { paused: !profile.paused })}
           className={iconButtonClass()}
         >
           {profile.paused ? (
@@ -142,7 +158,11 @@ export function EditorToolbar({
         <LanguageMenu locale={locale} onLanguageChange={onLanguageChange} />
         <ProfileMenu
           onRename={onRequestRename}
-          onClone={onClone}
+          onClone={() => {
+            void cloneProfile(profile.id, locale).then((saved) => {
+              if (saved) showNotice(t("profile.cloned"));
+            });
+          }}
           onPickColor={onPickColor}
           onExport={onExport}
           onCopy={onCopy}

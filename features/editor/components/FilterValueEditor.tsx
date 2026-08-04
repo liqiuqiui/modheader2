@@ -1,9 +1,9 @@
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import { TabPicker } from "../../../components/TabPicker";
+import type { ProfileFilter } from "../../../modules/profile/domain/profile-model";
 import type { BrowserTab } from "../../../types/browser";
 import { FILTER_LABEL_KEYS, METHODS, RESOURCE_TYPES } from "../constants";
-import type { FilterView } from "../types";
 import { FilterSelect } from "./FilterSelect";
 
 export function FilterValueEditor({
@@ -13,10 +13,10 @@ export function FilterValueEditor({
   onChange,
   autoFocus,
 }: {
-  filter: FilterView;
+  filter: ProfileFilter;
   tabs: BrowserTab[];
   currentTabId?: number;
-  onChange: (value: string | number) => void;
+  onChange: (value: ProfileFilter["value"]) => void;
   autoFocus?: boolean;
 }) {
   const { t } = useTranslation();
@@ -29,7 +29,7 @@ export function FilterValueEditor({
     return (
       <FilterSelect
         ariaLabel={t("filter.resourceTypeLabel")}
-        value={String(filter.value)}
+        value={filter.value}
         autoFocus={autoFocus}
         onValueChange={onChange}
         className="min-w-0 flex-1"
@@ -41,7 +41,7 @@ export function FilterValueEditor({
     return (
       <FilterSelect
         ariaLabel={t("filter.methodLabel")}
-        value={String(filter.value)}
+        value={filter.value}
         onValueChange={onChange}
         className="min-w-0 flex-1 font-semibold uppercase"
         options={METHODS.map((method) => ({ value: method, label: method.toUpperCase() }))}

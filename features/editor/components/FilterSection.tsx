@@ -3,20 +3,18 @@ import { DragDropProvider, type DragEndEvent } from "@dnd-kit/react";
 import { isSortableOperation } from "@dnd-kit/react/sortable";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
-import type { Profile } from "../../../types";
+import {
+  createProfileFilter,
+  orderedProfileFilters,
+} from "../../../modules/profile/domain/profile-filter";
+import type {
+  FilterKind,
+  FilterMode,
+  Profile,
+} from "../../../modules/profile/domain/profile-model";
+import { useProfileStore } from "../../../modules/profile/state/profile-store";
 import type { BrowserTab } from "../../../types/browser";
 import { FILTER_LABEL_KEYS } from "../constants";
-import { profileFilters } from "../filterModel";
-import {
-  addFilter,
-  changeFilterKind,
-  clearFilters,
-  deleteFilter,
-  reorderFilters,
-  setAllFiltersEnabled,
-  updateFilter,
-} from "../filterMutations";
-import type { FilterKind, FilterMode } from "../types";
 import { EmptyState } from "./EmptyState";
 import { FilterAddPanel } from "./FilterAddPanel";
 import { FilterRow } from "./FilterRow";
@@ -28,7 +26,6 @@ export function FilterSection({
   tabs,
   currentTabId,
   searchQuery,
-  onUpdate,
   focusFilterId,
   compact = false,
 }: {
@@ -36,17 +33,23 @@ export function FilterSection({
   tabs: BrowserTab[];
   currentTabId?: number;
   searchQuery: string;
-  onUpdate: (patch: Partial<Profile>) => void;
   focusFilterId?: string | null;
   compact?: boolean;
 }) {
   const { t } = useTranslation();
+  const addFilter = useProfileStore((state) => state.addFilter);
+  const patchFilter = useProfileStore((state) => state.patchFilter);
+  const changeFilterKind = useProfileStore((state) => state.changeFilterKind);
+  const deleteFilter = useProfileStore((state) => state.deleteFilter);
+  const reorderFilters = useProfileStore((state) => state.reorderFilters);
+  const setFiltersEnabled = useProfileStore((state) => state.setFiltersEnabled);
+  const clearFilters = useProfileStore((state) => state.clearFilters);
   const [open, setOpen] = useState(true);
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [draftKind, setDraftKind] = useState<FilterKind>("urlPattern");
   const [draftMode, setDraftMode] = useState<FilterMode>("include");
   const [localFocusFilterId, setLocalFocusFilterId] = useState<string | null>(null);
-  const filters = useMemo(() => profileFilters(profile), [profile]);
+  const filters = useMemo(() => orderedProfileFilters(profile), [profile]);
   const visibleFilters = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return filters;
@@ -65,9 +68,11 @@ export function FilterSection({
   const sortableDisabled = searchQuery.trim().length > 0;
 
   const handleAdd = (kind: FilterKind, mode: FilterMode = "include") => {
-    const result = addFilter(profile, tabs, kind, mode, currentTabId);
-    if (result.focusId) setLocalFocusFilterId(result.focusId);
-    onUpdate(result.patch);
+    const filter = createProfileFilter({ kind, mode, currentTabId: currentTab?.id });
+    if (kind === "urlPattern" || kind === "urlRegex") {
+      setLocalFocusFilterId(filter.id);
+    }
+    void addFilter(profile.id, filter);
     setOpen(true);
     setShowAddPanel(false);
   };
@@ -92,7 +97,10 @@ export function FilterSection({
     if (event.canceled || !isSortableOperation(event.operation)) return;
     const { source, target } = event.operation;
     if (!source || !target || source.sortable.index === target.sortable.index) return;
-    onUpdate(reorderFilters(filters, source.sortable.index, target.sortable.index));
+    const sourceFilterId = filters[source.sortable.index]?.id;
+    const targetFilterId = filters[target.sortable.index]?.id;
+    if (!sourceFilterId || !targetFilterId) return;
+    void reorderFilters(profile.id, sourceFilterId, targetFilterId);
   };
 
   return (
@@ -103,9 +111,9 @@ export function FilterSection({
         open={open}
         enabled={enabled}
         onToggle={() => setOpen((current) => !current)}
-        onToggleEnabled={() => onUpdate(setAllFiltersEnabled(profile, !enabled))}
+        onToggleEnabled={() => void setFiltersEnabled(profile.id, !enabled)}
         onAdd={handleAddButton}
-        onClear={() => onUpdate(clearFilters())}
+        onClear={() => void clearFilters(profile.id)}
         enableAllLabel={t("filter.enableAll")}
         disableAllLabel={t("filter.disableAll")}
         addLabel={t("filter.add")}
@@ -135,11 +143,11 @@ export function FilterSection({
               autoFocusValue={filter.id === focusFilterId || filter.id === localFocusFilterId}
               tabs={tabs}
               currentTabId={currentTabId}
-              onPatch={(patch) => onUpdate(updateFilter(profile, filter, patch))}
+              onPatch={(patch) => void patchFilter(profile.id, filter.id, filter.kind, patch)}
               onKindChange={(kind) =>
-                onUpdate(changeFilterKind(profile, tabs, filter, kind, currentTabId))
+                void changeFilterKind(profile.id, filter.id, kind, currentTab?.id)
               }
-              onDelete={() => onUpdate(deleteFilter(profile, filter.id))}
+              onDelete={() => void deleteFilter(profile.id, filter.id)}
               sortableIndex={filterIndices.get(filter.id) ?? 0}
               sortableDisabled={sortableDisabled}
               compact={compact}

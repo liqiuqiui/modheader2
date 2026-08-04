@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "../../../components/ui/select";
 
-export function FilterSelect({
+export function FilterSelect<T extends string>({
   ariaLabel,
   value,
   options,
@@ -17,14 +17,14 @@ export function FilterSelect({
   autoFocus,
 }: {
   ariaLabel: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onValueChange: (value: string) => void;
+  value: T;
+  options: readonly { value: T; label: string }[];
+  onValueChange: (value: T) => void;
   className?: string;
   autoFocus?: boolean;
 }) {
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <Select value={value} onValueChange={(nextValue) => onValueChange(nextValue as T)}>
       <SelectTrigger aria-label={ariaLabel} className={clsx(className)} autoFocus={autoFocus}>
         <SelectValue />
       </SelectTrigger>
