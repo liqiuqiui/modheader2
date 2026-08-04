@@ -3,7 +3,7 @@ import { createStore } from "zustand/vanilla";
 import { SIDEBAR_COLLAPSED_KEY } from "../constants";
 import type { EditorMode } from "../types";
 
-export type FocusRequestKind = "header" | "cookie" | "filter";
+export type FocusRequestKind = "header" | "csp" | "cookie" | "filter";
 
 export interface FocusRequest {
   kind: FocusRequestKind;

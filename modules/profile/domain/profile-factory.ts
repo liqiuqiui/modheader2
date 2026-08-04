@@ -4,6 +4,7 @@ import {
   getProfileTextColor,
   randomProfileColor,
 } from "./profile-appearance";
+import { CONTENT_SECURITY_POLICY_HEADER } from "./profile-csp";
 import type { CookieRule, HeaderRule, Profile, UrlReplacement } from "./profile-model";
 
 export function createHeaderRule(overrides?: Partial<HeaderRule>): HeaderRule {
@@ -17,6 +18,14 @@ export function createHeaderRule(overrides?: Partial<HeaderRule>): HeaderRule {
     sendEmptyHeader: false,
     ...overrides,
   };
+}
+
+export function createCspRule(overrides?: Partial<HeaderRule>): HeaderRule {
+  return createHeaderRule({
+    ...overrides,
+    name: CONTENT_SECURITY_POLICY_HEADER,
+    cspMode: "directive",
+  });
 }
 
 export function createUrlReplacement(overrides?: Partial<UrlReplacement>): UrlReplacement {

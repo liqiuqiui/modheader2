@@ -7,6 +7,7 @@ import type {
   ProfileRuleCollection,
   UrlReplacement,
 } from "./profile-model";
+import { CONTENT_SECURITY_POLICY_HEADER, isContentSecurityPolicyRule } from "./profile-csp";
 import { profileHasEntityId } from "./profile-operations";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -17,6 +18,7 @@ function isRuleCollection(value: unknown): value is ProfileRuleCollection {
   return (
     value === "headers" ||
     value === "respHeaders" ||
+    value === "csp" ||
     value === "cookies" ||
     value === "urlReplacements"
   );
@@ -24,9 +26,45 @@ function isRuleCollection(value: unknown): value is ProfileRuleCollection {
 
 function ruleCollection(profile: Profile, collection: ProfileRuleCollection): ProfileRule[] {
   if (collection === "headers") return profile.headers;
-  if (collection === "respHeaders") return profile.respHeaders;
+  if (collection === "respHeaders") {
+    return profile.respHeaders.filter((rule) => !isContentSecurityPolicyRule(rule));
+  }
+  if (collection === "csp") {
+    return profile.respHeaders.filter(isContentSecurityPolicyRule);
+  }
   if (collection === "cookies") return profile.cookies;
   return profile.urlReplacements;
+}
+
+function replaceResponseRuleCollection(
+  profile: Profile,
+  collection: Extract<ProfileRuleCollection, "respHeaders" | "csp">,
+  rules: ProfileRule[],
+): Profile {
+  const matchesCollection =
+    collection === "csp"
+      ? isContentSecurityPolicyRule
+      : (rule: HeaderRule) => !isContentSecurityPolicyRule(rule);
+  const existingIds = new Set(profile.respHeaders.filter(matchesCollection).map((rule) => rule.id));
+  const normalizeRule = (rule: HeaderRule): HeaderRule =>
+    collection === "csp" ? { ...rule, name: CONTENT_SECURITY_POLICY_HEADER } : rule;
+  const replacements = new Map(
+    (rules as HeaderRule[]).map((rule) => [rule.id, normalizeRule(rule)]),
+  );
+  const respHeaders: HeaderRule[] = [];
+  for (const rule of profile.respHeaders) {
+    if (!existingIds.has(rule.id)) {
+      respHeaders.push(rule);
+      continue;
+    }
+    const replacement = replacements.get(rule.id);
+    if (replacement) {
+      respHeaders.push(replacement);
+      replacements.delete(rule.id);
+    }
+  }
+  respHeaders.push(...replacements.values());
+  return { ...profile, respHeaders };
 }
 
 function locateRule(
@@ -34,12 +72,17 @@ function locateRule(
   collection: ProfileRuleCollection,
   ruleId: string,
 ): { collection: ProfileRuleCollection; rule: ProfileRule } | undefined {
-  const rule = ruleCollection(profile, collection).find((item) => item.id === ruleId);
-  if (rule) return { collection, rule };
-  if (collection !== "headers" && collection !== "respHeaders") return undefined;
-  const alternate = collection === "headers" ? "respHeaders" : "headers";
-  const movedRule = ruleCollection(profile, alternate).find((item) => item.id === ruleId);
-  return movedRule ? { collection: alternate, rule: movedRule } : undefined;
+  const collections: ProfileRuleCollection[] = [collection];
+  if (collection === "headers" || collection === "respHeaders" || collection === "csp") {
+    for (const alternate of ["headers", "respHeaders", "csp"] as const) {
+      if (!collections.includes(alternate)) collections.push(alternate);
+    }
+  }
+  for (const candidate of collections) {
+    const rule = ruleCollection(profile, candidate).find((item) => item.id === ruleId);
+    if (rule) return { collection: candidate, rule };
+  }
+  return undefined;
 }
 
 function replaceRuleCollection(
@@ -48,7 +91,9 @@ function replaceRuleCollection(
   rules: ProfileRule[],
 ): Profile {
   if (collection === "headers") return { ...profile, headers: rules as HeaderRule[] };
-  if (collection === "respHeaders") return { ...profile, respHeaders: rules as HeaderRule[] };
+  if (collection === "respHeaders" || collection === "csp") {
+    return replaceResponseRuleCollection(profile, collection, rules);
+  }
   if (collection === "cookies") return { ...profile, cookies: rules as CookieRule[] };
   return { ...profile, urlReplacements: rules as UrlReplacement[] };
 }
@@ -64,9 +109,10 @@ function sanitizedRulePatch(
   if (!isRecord(patch)) return {};
   const sanitized: Record<string, unknown> = {};
   if (typeof patch.enabled === "boolean") sanitized.enabled = patch.enabled;
-  if (typeof patch.name === "string") sanitized.name = patch.name;
   if (typeof patch.value === "string") sanitized.value = patch.value;
   if (typeof patch.comment === "string") sanitized.comment = patch.comment;
+  if (collection === "csp") return sanitized;
+  if (typeof patch.name === "string") sanitized.name = patch.name;
   if (collection === "headers" || collection === "respHeaders") {
     if (isAppendMode(patch.appendMode)) sanitized.appendMode = patch.appendMode;
     if (typeof patch.sendEmptyHeader === "boolean") {
@@ -86,9 +132,17 @@ export function addProfileRule(profile: Profile, collection: unknown, rule: unkn
   ) {
     return profile;
   }
+  const normalizedRule =
+    collection === "csp"
+      ? {
+          ...(rule as unknown as HeaderRule),
+          name: CONTENT_SECURITY_POLICY_HEADER,
+          cspMode: "directive" as const,
+        }
+      : (rule as unknown as ProfileRule);
   return replaceRuleCollection(profile, collection, [
     ...ruleCollection(profile, collection),
-    rule as unknown as ProfileRule,
+    normalizedRule,
   ]);
 }
 
@@ -179,12 +233,21 @@ export function convertProfileHeader(profile: Profile, ruleId: string, target: u
   if (target !== "headers" && target !== "respHeaders") return profile;
   const source = target === "headers" ? "respHeaders" : "headers";
   const located = locateRule(profile, source, ruleId);
-  if (!located || located.collection === target) return profile;
-  return {
-    ...profile,
-    [located.collection]: profile[located.collection].filter((item) => item.id !== ruleId),
-    [target]: [...profile[target], located.rule as HeaderRule],
-  };
+  const alreadyInTarget =
+    located &&
+    (target === "headers"
+      ? located.collection === "headers"
+      : located.collection === "respHeaders" || located.collection === "csp");
+  if (!located || alreadyInTarget) return profile;
+  const withoutSource = replaceRuleCollection(
+    profile,
+    located.collection,
+    ruleCollection(profile, located.collection).filter((item) => item.id !== ruleId),
+  );
+  return replaceRuleCollection(withoutSource, target, [
+    ...ruleCollection(withoutSource, target),
+    located.rule,
+  ]);
 }
 
 export function sortProfileRuleCollections(profile: Profile): Profile {

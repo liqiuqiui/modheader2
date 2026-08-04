@@ -14,6 +14,7 @@ export function FilterSelect<T extends string>({
   options,
   onValueChange,
   className,
+  itemClassName,
   autoFocus,
 }: {
   ariaLabel: string;
@@ -21,6 +22,7 @@ export function FilterSelect<T extends string>({
   options: readonly { value: T; label: string }[];
   onValueChange: (value: T) => void;
   className?: string;
+  itemClassName?: string;
   autoFocus?: boolean;
 }) {
   return (
@@ -31,7 +33,7 @@ export function FilterSelect<T extends string>({
       <SelectContent>
         <SelectGroup>
           {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
+            <SelectItem key={option.value} value={option.value} className={itemClassName}>
               {option.label}
             </SelectItem>
           ))}

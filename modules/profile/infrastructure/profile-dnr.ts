@@ -1,4 +1,11 @@
 import { browser, type Browser } from "wxt/browser";
+import {
+  CONTENT_SECURITY_POLICY_HEADER,
+  createCspDirectiveValue,
+  createContentSecurityPolicyValue,
+  isContentSecurityPolicyRule,
+  isCspDirectiveRule,
+} from "../domain/profile-csp";
 import { orderedProfileFilters } from "../domain/profile-filter";
 import type {
   CookieRule,
@@ -61,6 +68,10 @@ function isInitiatorDomain(value: string): boolean {
 
 function appendModeToOperation(rule: HeaderRule): HeaderOperation {
   return rule.appendMode === "append" || rule.appendMode === "comma" ? "append" : "set";
+}
+
+function isEffectiveHeaderRule(rule: HeaderRule): boolean {
+  return Boolean(rule.enabled && rule.name.trim() && (rule.value || rule.sendEmptyHeader));
 }
 
 function activeFilters(profile: Profile): ProfileFilter[] {
@@ -209,7 +220,7 @@ function headerRuleToDnr(
   urlFilter?: UrlProfileFilter,
 ): PendingProfileDnrRule | null {
   const name = rule.name.trim();
-  if (!rule.enabled || !name || (!rule.value && !rule.sendEmptyHeader)) return null;
+  if (!isEffectiveHeaderRule(rule)) return null;
 
   return {
     action: {
@@ -219,6 +230,36 @@ function headerRuleToDnr(
           header: name,
           operation: appendModeToOperation(rule),
           value: rule.value,
+        },
+      ],
+    },
+    condition: withUrlCondition(condition, urlFilter),
+  };
+}
+
+function contentSecurityPolicyToDnr(
+  rules: HeaderRule[],
+  operation: HeaderOperation,
+  condition: DnrCondition,
+  urlFilter?: UrlProfileFilter,
+): PendingProfileDnrRule | null {
+  const value = createContentSecurityPolicyValue(rules);
+  const effectiveRules = rules.filter(
+    (rule) =>
+      rule.enabled &&
+      isCspDirectiveRule(rule) &&
+      (Boolean(createCspDirectiveValue(rule)) || rule.sendEmptyHeader),
+  );
+  if (!value && effectiveRules.length === 0) return null;
+
+  return {
+    action: {
+      type: "modifyHeaders",
+      responseHeaders: [
+        {
+          header: CONTENT_SECURITY_POLICY_HEADER,
+          operation,
+          value,
         },
       ],
     },
@@ -331,7 +372,13 @@ export function compileProfileDnrRules(profile?: Profile): ProfileDnrCompilation
       if (candidate) actionRules.push(candidate);
     }
   }
+  const contentSecurityPolicyRules = profile.respHeaders.filter(isCspDirectiveRule);
+  const hasEffectiveLegacyContentSecurityPolicy = profile.respHeaders.some(
+    (rule) =>
+      isContentSecurityPolicyRule(rule) && !isCspDirectiveRule(rule) && isEffectiveHeaderRule(rule),
+  );
   for (const rule of profile.respHeaders) {
+    if (isCspDirectiveRule(rule)) continue;
     for (const urlFilter of urlVariants) {
       const candidate = headerRuleToDnr(
         rule,
@@ -341,6 +388,15 @@ export function compileProfileDnrRules(profile?: Profile): ProfileDnrCompilation
       );
       if (candidate) actionRules.push(candidate);
     }
+  }
+  for (const urlFilter of urlVariants) {
+    const candidate = contentSecurityPolicyToDnr(
+      contentSecurityPolicyRules,
+      hasEffectiveLegacyContentSecurityPolicy ? "append" : "set",
+      conditionResult.condition,
+      urlFilter,
+    );
+    if (candidate) actionRules.push(candidate);
   }
   for (const urlFilter of urlVariants) {
     const candidate = cookiesToDnr(profile.cookies, conditionResult.condition, urlFilter);

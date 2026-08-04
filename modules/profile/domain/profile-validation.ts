@@ -32,7 +32,8 @@ export function isHeaderRule(value: unknown): value is HeaderRule {
     typeof value.value === "string" &&
     typeof value.comment === "string" &&
     isAppendMode(value.appendMode) &&
-    typeof value.sendEmptyHeader === "boolean"
+    typeof value.sendEmptyHeader === "boolean" &&
+    (value.cspMode === undefined || value.cspMode === "directive")
   );
 }
 

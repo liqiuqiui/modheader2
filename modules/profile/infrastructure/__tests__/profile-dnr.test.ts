@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createCspRule,
   createHeaderRule,
   createProfile,
   createUrlReplacement,
@@ -255,6 +256,195 @@ describe("Profile DNR compilation", () => {
         requestHeaders: [{ header: "x-empty", operation: "set", value: "" }],
       },
     });
+  });
+
+  it("combines CSP directives into one dedicated response header rule", () => {
+    const profile = {
+      ...profileWithFilters([]),
+      headers: [],
+      respHeaders: [
+        createHeaderRule({ id: "response-1", name: "x-response", value: "1" }),
+        createCspRule({ id: "csp-1", value: "default-src 'self';" }),
+        createCspRule({ id: "csp-2", value: "script-src 'none'" }),
+        createCspRule({ id: "csp-3", value: "upgrade-insecure-requests" }),
+        createCspRule({ id: "csp-draft", value: "\t'self'" }),
+        createCspRule({ id: "csp-disabled", value: "img-src data:", enabled: false }),
+      ],
+    };
+    const rules = compileProfileDnrRules(profile).rules;
+
+    expect(rules).toHaveLength(2);
+    expect(rules[0]).toMatchObject({
+      action: {
+        type: "modifyHeaders",
+        responseHeaders: [{ header: "x-response", operation: "set", value: "1" }],
+      },
+    });
+    expect(rules[1]).toMatchObject({
+      action: {
+        type: "modifyHeaders",
+        responseHeaders: [
+          {
+            header: "Content-Security-Policy",
+            operation: "set",
+            value: "default-src 'self'; script-src 'none'; upgrade-insecure-requests",
+          },
+        ],
+      },
+    });
+  });
+
+  it("preserves the append mode for a single legacy CSP response rule", () => {
+    const profile = {
+      ...profileWithFilters([]),
+      headers: [],
+      respHeaders: [
+        createHeaderRule({
+          id: "csp-append",
+          name: "Content-Security-Policy",
+          value: "frame-ancestors 'none'",
+          appendMode: "append",
+        }),
+        createHeaderRule({ id: "csp-empty-draft", name: "Content-Security-Policy" }),
+      ],
+    };
+
+    expect(compileProfileDnrRules(profile).rules[0]).toMatchObject({
+      action: {
+        type: "modifyHeaders",
+        responseHeaders: [
+          {
+            header: "Content-Security-Policy",
+            operation: "append",
+            value: "frame-ancestors 'none'",
+          },
+        ],
+      },
+    });
+  });
+
+  it("keeps legacy CSP headers separate while combining new directive rows", () => {
+    const profile = {
+      ...profileWithFilters([]),
+      headers: [],
+      respHeaders: [
+        createHeaderRule({
+          id: "legacy-default",
+          name: "Content-Security-Policy",
+          value: "default-src 'none'",
+          appendMode: "append",
+        }),
+        createHeaderRule({
+          id: "legacy-image",
+          name: "content-security-policy",
+          value: "img-src https://cdn.example",
+          appendMode: "append",
+        }),
+        createCspRule({
+          id: "directive-script",
+          value: "script-src\t'self'",
+          appendMode: "append",
+        }),
+        createCspRule({
+          id: "directive-upgrade",
+          value: "upgrade-insecure-requests",
+        }),
+      ],
+    };
+    const rules = compileProfileDnrRules(profile).rules;
+
+    expect(rules).toHaveLength(3);
+    expect(rules.map((rule) => rule.action)).toEqual([
+      {
+        type: "modifyHeaders",
+        responseHeaders: [
+          {
+            header: "Content-Security-Policy",
+            operation: "append",
+            value: "default-src 'none'",
+          },
+        ],
+      },
+      {
+        type: "modifyHeaders",
+        responseHeaders: [
+          {
+            header: "content-security-policy",
+            operation: "append",
+            value: "img-src https://cdn.example",
+          },
+        ],
+      },
+      {
+        type: "modifyHeaders",
+        responseHeaders: [
+          {
+            header: "Content-Security-Policy",
+            operation: "append",
+            value: "script-src 'self'; upgrade-insecure-requests",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("places a directive group after legacy CSP so its append operation remains effective", () => {
+    const profile = {
+      ...profileWithFilters([]),
+      headers: [],
+      respHeaders: [
+        createCspRule({
+          id: "directive-disabled",
+          value: "default-src 'self'",
+          enabled: false,
+        }),
+        createCspRule({ id: "directive-active", value: "script-src 'none'" }),
+        createHeaderRule({
+          id: "legacy-csp",
+          name: "Content-Security-Policy",
+          value: "frame-ancestors 'none'",
+          appendMode: "append",
+        }),
+        createCspRule({ id: "directive-draft", value: "\t'self'" }),
+      ],
+    };
+    const rules = compileProfileDnrRules(profile).rules;
+
+    expect(rules).toHaveLength(2);
+    expect(rules[0]).toMatchObject({
+      priority: 1000,
+      action: {
+        responseHeaders: [
+          {
+            header: "Content-Security-Policy",
+            operation: "append",
+            value: "frame-ancestors 'none'",
+          },
+        ],
+      },
+    });
+    expect(rules[1]).toMatchObject({
+      priority: 999,
+      action: {
+        responseHeaders: [
+          {
+            header: "Content-Security-Policy",
+            operation: "append",
+            value: "script-src 'none'",
+          },
+        ],
+      },
+    });
+  });
+
+  it("does not emit a CSP header for separator-only directive drafts", () => {
+    const profile = {
+      ...profileWithFilters([]),
+      headers: [],
+      respHeaders: [createCspRule({ id: "csp-separators", value: ";;;" })],
+    };
+
+    expect(compileProfileDnrRules(profile)).toEqual({ rules: [], diagnostics: [] });
   });
 
   it("fails closed when URL includes are combined with redirects", () => {

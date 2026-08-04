@@ -4,6 +4,7 @@ import { Filter, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   createCookieRule,
+  createCspRule,
   createHeaderRule,
   createUrlReplacement,
 } from "../../../modules/profile/domain/profile-factory";
@@ -86,9 +87,9 @@ export function QuickAddActions({ mode }: { mode: EditorMode }) {
             <DropdownMenu.Item
               className={menuItemClass}
               onSelect={() => {
-                const nextRule = createHeaderRule({ name: "Content-Security-Policy" });
-                requestFocus("header", nextRule.id);
-                void addRule(profileId, "respHeaders", nextRule);
+                const nextRule = createCspRule();
+                requestFocus("csp", nextRule.id);
+                void addRule(profileId, "csp", nextRule);
               }}
             >
               {t("mod.csp")}

@@ -5,6 +5,7 @@ import type { ProfileFilter } from "../../../modules/profile/domain/profile-mode
 import type { BrowserTab } from "../../../types/browser";
 import { FILTER_LABEL_KEYS, METHODS, RESOURCE_TYPES } from "../constants";
 import { FilterSelect } from "./FilterSelect";
+import { filterSelectTextClass } from "./styles";
 
 export function FilterValueEditor({
   filter,
@@ -33,6 +34,7 @@ export function FilterValueEditor({
         autoFocus={autoFocus}
         onValueChange={onChange}
         className="min-w-0 flex-1"
+        itemClassName={filterSelectTextClass}
         options={RESOURCE_TYPES.map(([value, labelKey]) => ({ value, label: t(labelKey) }))}
       />
     );
@@ -44,6 +46,7 @@ export function FilterValueEditor({
         value={filter.value}
         onValueChange={onChange}
         className="min-w-0 flex-1 font-semibold uppercase"
+        itemClassName={filterSelectTextClass}
         options={METHODS.map((method) => ({ value: method, label: method.toUpperCase() }))}
       />
     );

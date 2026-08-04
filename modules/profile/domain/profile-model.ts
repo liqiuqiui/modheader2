@@ -1,5 +1,7 @@
 export type AppendMode = "override" | "append" | "comma";
 
+export type CspRuleMode = "directive";
+
 export interface HeaderRule {
   id: string;
   enabled: boolean;
@@ -8,6 +10,7 @@ export interface HeaderRule {
   comment: string;
   appendMode: AppendMode;
   sendEmptyHeader: boolean;
+  cspMode?: CspRuleMode;
 }
 
 export const REQUEST_METHODS = [
@@ -120,12 +123,15 @@ export type ProfileMetadataPatch = Partial<
 export interface ProfileRuleCollectionMap {
   headers: HeaderRule;
   respHeaders: HeaderRule;
+  csp: HeaderRule;
   cookies: CookieRule;
   urlReplacements: UrlReplacement;
 }
 
 export type ProfileRuleCollection = keyof ProfileRuleCollectionMap;
 export type ProfileRule = ProfileRuleCollectionMap[ProfileRuleCollection];
-export type ProfileRulePatch<K extends ProfileRuleCollection> = Partial<
-  Omit<ProfileRuleCollectionMap[K], "id">
->;
+export type ProfileRulePatch<K extends ProfileRuleCollection> = K extends "csp"
+  ? Partial<Pick<HeaderRule, "enabled" | "value" | "comment">>
+  : K extends "headers" | "respHeaders"
+    ? Partial<Omit<HeaderRule, "id" | "cspMode">>
+    : Partial<Omit<ProfileRuleCollectionMap[K], "id">>;

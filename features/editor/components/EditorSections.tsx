@@ -1,12 +1,14 @@
 import { useEffect } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
+import { isContentSecurityPolicyRule } from "../../../modules/profile/domain/profile-csp";
 import { selectSelectedProfile } from "../../../modules/profile/state/profile-selectors";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
 import { useBrowserTabsStore } from "../stores/browser-tabs-store";
 import { useEditorUiStore } from "../stores/editor-ui-store";
 import type { EditorMode } from "../types";
 import { CookieSection } from "./CookieSection";
+import { CspSection } from "./CspSection";
 import { FilterSection } from "./FilterSection";
 import { HeaderSection } from "./HeaderSection";
 import { RedirectSection } from "./RedirectSection";
@@ -29,6 +31,9 @@ export function EditorSections({ mode }: { mode: EditorMode }) {
 
   if (!profile) return null;
 
+  const responseHeaders = profile.respHeaders.filter((rule) => !isContentSecurityPolicyRule(rule));
+  const contentSecurityPolicyRules = profile.respHeaders.filter(isContentSecurityPolicyRule);
+
   return (
     <div className={clsx(compact ? "space-y-2.5" : "space-y-4")}>
       <HeaderSection
@@ -50,15 +55,24 @@ export function EditorSections({ mode }: { mode: EditorMode }) {
           compact={compact}
         />
       )}
-      {profile.respHeaders.length > 0 && (
+      {responseHeaders.length > 0 && (
         <HeaderSection
           profileId={profile.id}
           title={t("section.responseHeaders")}
           collection="respHeaders"
-          rules={profile.respHeaders}
+          rules={responseHeaders}
           searchQuery={searchQuery}
           focusRuleId={focusRequest?.kind === "header" ? focusRequest.id : null}
           convertLabel={t("header.convertToRequest")}
+          compact={compact}
+        />
+      )}
+      {contentSecurityPolicyRules.length > 0 && (
+        <CspSection
+          profileId={profile.id}
+          rules={contentSecurityPolicyRules}
+          searchQuery={searchQuery}
+          focusRuleId={focusRequest?.kind === "csp" ? focusRequest.id : null}
           compact={compact}
         />
       )}

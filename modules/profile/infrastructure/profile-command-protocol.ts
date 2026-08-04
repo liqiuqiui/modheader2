@@ -1,4 +1,5 @@
 import type { ProfileCommand } from "../application/profile-command";
+import { isCspDirectiveRule } from "../domain/profile-csp";
 import type { ProfileDocument } from "../domain/profile-document";
 import { isFilterKind, isFilterMode, isProfileFilter } from "../domain/profile-filter";
 import type { ProfileRuleCollection } from "../domain/profile-model";
@@ -43,6 +44,7 @@ function isProfileRuleCollection(value: unknown): value is ProfileRuleCollection
   return (
     value === "headers" ||
     value === "respHeaders" ||
+    value === "csp" ||
     value === "cookies" ||
     value === "urlReplacements"
   );
@@ -66,6 +68,7 @@ function isProfileMetadataPatch(value: unknown): boolean {
 }
 
 function isProfileRule(collection: ProfileRuleCollection, value: unknown): boolean {
+  if (collection === "csp") return isHeaderRule(value) && isCspDirectiveRule(value);
   if (collection === "headers" || collection === "respHeaders") return isHeaderRule(value);
   if (collection === "cookies") return isCookieRule(value);
   return isUrlReplacement(value);
@@ -77,6 +80,14 @@ function isAppendMode(value: unknown): boolean {
 
 function isProfileRulePatch(collection: ProfileRuleCollection, value: unknown): boolean {
   if (!isRecord(value)) return false;
+  if (collection === "csp") {
+    return (
+      hasOnlyKeys(value, ["enabled", "value", "comment"]) &&
+      (value.enabled === undefined || typeof value.enabled === "boolean") &&
+      (value.value === undefined || typeof value.value === "string") &&
+      (value.comment === undefined || typeof value.comment === "string")
+    );
+  }
   const headerCollection = collection === "headers" || collection === "respHeaders";
   const allowedKeys = headerCollection
     ? ["enabled", "name", "value", "comment", "appendMode", "sendEmptyHeader"]

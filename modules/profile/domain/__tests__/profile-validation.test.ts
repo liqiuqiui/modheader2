@@ -30,6 +30,30 @@ describe("Profile schema v2 validation", () => {
     expect(isProfileDocument(createInitialProfileDocument(profile, "test", 1))).toBe(true);
   });
 
+  it("accepts only the supported optional CSP rule mode", () => {
+    const profile = emptyProfile();
+    profile.respHeaders = [
+      {
+        id: "csp-1",
+        enabled: true,
+        name: "Content-Security-Policy",
+        value: "default-src\t'self'",
+        comment: "",
+        appendMode: "override",
+        sendEmptyHeader: false,
+        cspMode: "directive",
+      },
+    ];
+
+    expect(isProfile(profile)).toBe(true);
+    expect(
+      isProfile({
+        ...profile,
+        respHeaders: [{ ...profile.respHeaders[0], cspMode: "unsupported" }],
+      }),
+    ).toBe(false);
+  });
+
   it("rejects the legacy categorized filter shape", () => {
     const profile = emptyProfile() as unknown as Record<string, unknown>;
     delete profile.filters;

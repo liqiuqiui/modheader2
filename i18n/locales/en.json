@@ -64,6 +64,7 @@
   "section": {
     "requestHeaders": "Request Headers",
     "responseHeaders": "Response Headers",
+    "csp": "Content-Security-Policy",
     "cookies": "Cookies",
     "urlRedirects": "URL Redirects",
     "filters": "Filters",
@@ -95,6 +96,25 @@
     "override": "Override",
     "append": "Append",
     "comma": "Comma append"
+  },
+  "csp": {
+    "directive": "CSP directive",
+    "directivePlaceholder": "Directive (script-src…)",
+    "value": "Directive value",
+    "valuePlaceholder": "Directive value",
+    "enable": "Enable CSP directive",
+    "enableRule": "Enable CSP directive {{directive}}",
+    "disableRule": "Disable CSP directive {{directive}}",
+    "delete": "Delete CSP directive",
+    "deleteRule": "Delete CSP directive {{directive}}",
+    "more": "More CSP directive actions",
+    "moreRule": "More actions for CSP directive {{directive}}",
+    "ruleLabel": "CSP directive {{directive}}",
+    "unnamed": "unnamed",
+    "addComment": "Add comment",
+    "clone": "Duplicate directive",
+    "comment": "Directive comment",
+    "commentPlaceholder": "Add a comment describing this directive…"
   },
   "filter": {
     "urlPattern": "URL pattern",

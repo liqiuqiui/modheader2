@@ -64,6 +64,7 @@
   "section": {
     "requestHeaders": "请求头",
     "responseHeaders": "响应头",
+    "csp": "Content-Security-Policy",
     "cookies": "Cookies",
     "urlRedirects": "URL 重定向",
     "filters": "过滤器",
@@ -95,6 +96,25 @@
     "override": "覆盖",
     "append": "追加",
     "comma": "逗号追加"
+  },
+  "csp": {
+    "directive": "CSP 指令",
+    "directivePlaceholder": "指令（如 script-src…）",
+    "value": "指令值",
+    "valuePlaceholder": "指令值",
+    "enable": "启用 CSP 指令",
+    "enableRule": "启用 CSP 指令 {{directive}}",
+    "disableRule": "禁用 CSP 指令 {{directive}}",
+    "delete": "删除 CSP 指令",
+    "deleteRule": "删除 CSP 指令 {{directive}}",
+    "more": "CSP 指令更多操作",
+    "moreRule": "CSP 指令 {{directive}} 的更多操作",
+    "ruleLabel": "CSP 指令 {{directive}}",
+    "unnamed": "未命名",
+    "addComment": "添加注释",
+    "clone": "复制 CSP 指令",
+    "comment": "CSP 指令注释",
+    "commentPlaceholder": "添加注释，说明这条指令的用途…"
   },
   "filter": {
     "urlPattern": "URL 匹配模式",

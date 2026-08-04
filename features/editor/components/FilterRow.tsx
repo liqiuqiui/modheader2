@@ -14,6 +14,7 @@ import type { BrowserTab } from "../../../types/browser";
 import { FILTER_LABEL_KEYS } from "../constants";
 import { FilterSelect } from "./FilterSelect";
 import { FilterValueEditor } from "./FilterValueEditor";
+import { filterSelectTextClass } from "./styles";
 
 export function FilterRow({
   filter,
@@ -75,7 +76,8 @@ export function FilterRow({
           ariaLabel={t("filter.modeLabel")}
           value={filter.mode}
           onValueChange={(mode) => onPatch({ mode })}
-          className={clsx("shrink-0 font-medium", isEnglish ? "w-24" : "w-[84px]")}
+          className={clsx("shrink-0", filterSelectTextClass, isEnglish ? "w-24" : "w-[84px]")}
+          itemClassName={filterSelectTextClass}
           options={FILTER_MODES.map((mode) => ({
             value: mode,
             label: t(mode === "include" ? "filter.include" : "filter.exclude"),
@@ -85,7 +87,8 @@ export function FilterRow({
           ariaLabel={t("filter.typeLabel")}
           value={filter.kind}
           onValueChange={onKindChange}
-          className={clsx("shrink-0", isEnglish ? "w-36" : "w-[122px]")}
+          className={clsx("shrink-0", filterSelectTextClass, isEnglish ? "w-36" : "w-[122px]")}
+          itemClassName={filterSelectTextClass}
           options={FILTER_KINDS.map((kind) => ({
             value: kind,
             label: t(FILTER_LABEL_KEYS[kind]),
