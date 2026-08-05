@@ -9,6 +9,7 @@ import type {
   ProfileRuleCollection,
 } from "../../../modules/profile/domain/profile-model";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
+import { REQUEST_HEADER_NAME_SUGGESTIONS, RESPONSE_HEADER_NAME_SUGGESTIONS } from "../constants";
 import { useEditorUiStore } from "../stores/editor-ui-store";
 import { EmptyState } from "./EmptyState";
 import { SectionContent } from "./SectionContent";
@@ -53,6 +54,8 @@ export function HeaderSection({
   }, [rules, searchQuery]);
 
   const enabled = rules.some((rule) => rule.enabled);
+  const nameSuggestions =
+    collection === "headers" ? REQUEST_HEADER_NAME_SUGGESTIONS : RESPONSE_HEADER_NAME_SUGGESTIONS;
 
   return (
     <section>
@@ -76,6 +79,7 @@ export function HeaderSection({
           <HeaderRuleRow
             key={rule.id}
             rule={rule}
+            nameSuggestions={nameSuggestions}
             autoFocus={rule.id === focusRuleId || rule.id === localFocusRuleId}
             onChange={(patch) => {
               void patchRule(profileId, collection, rule.id, patch);

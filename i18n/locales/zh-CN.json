@@ -64,7 +64,7 @@
   "section": {
     "requestHeaders": "请求头",
     "responseHeaders": "响应头",
-    "csp": "Content-Security-Policy",
+    "csp": "内容安全策略（CSP）",
     "cookies": "Cookies",
     "urlRedirects": "URL 重定向",
     "filters": "过滤器",
@@ -80,6 +80,7 @@
   "header": {
     "name": "Header 名称",
     "namePlaceholder": "Header 名称",
+    "noNameSuggestions": "没有匹配的预设，将保留当前自定义名称。",
     "value": "Header 值",
     "valuePlaceholder": "值",
     "mode": "Header 操作模式",
@@ -191,7 +192,7 @@
   },
   "mod": {
     "title": "添加修改",
-    "quickAdd": "修改",
+    "quickAdd": "添加",
     "cookies": "Cookies",
     "csp": "内容安全策略（CSP）",
     "count": "{{count}} 个修改"

@@ -80,6 +80,7 @@
   "header": {
     "name": "Header name",
     "namePlaceholder": "Header name",
+    "noNameSuggestions": "No matching preset. Your custom name will be kept.",
     "value": "Header value",
     "valuePlaceholder": "Value",
     "mode": "Header operation",
@@ -191,7 +192,7 @@
   },
   "mod": {
     "title": "Add modification",
-    "quickAdd": "MOD",
+    "quickAdd": "ADD",
     "cookies": "Cookies",
     "csp": "Content-Security-Policy",
     "count": "{{count}} modifications"

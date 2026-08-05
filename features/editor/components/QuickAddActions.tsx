@@ -1,5 +1,4 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { clsx } from "clsx";
 import { Filter, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -11,10 +10,9 @@ import {
 import { createProfileFilter } from "../../../modules/profile/domain/profile-filter";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
 import { useEditorUiStore } from "../stores/editor-ui-store";
-import type { EditorMode } from "../types";
 import { menuItemClass } from "./styles";
 
-export function QuickAddActions({ mode }: { mode: EditorMode }) {
+export function QuickAddActions() {
   const { t } = useTranslation();
   const profileId = useProfileStore((state) => state.selectedProfileId);
   const addRule = useProfileStore((state) => state.addRule);
@@ -23,13 +21,7 @@ export function QuickAddActions({ mode }: { mode: EditorMode }) {
   if (!profileId) return null;
 
   return (
-    <div
-      className={clsx(
-        mode === "popup"
-          ? "mt-3 flex flex-wrap items-center gap-2"
-          : "mt-5 flex flex-wrap items-center gap-2",
-      )}
-    >
+    <div className="flex flex-wrap items-center gap-2">
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
           <button

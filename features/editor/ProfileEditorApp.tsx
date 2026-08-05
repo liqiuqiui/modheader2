@@ -180,7 +180,7 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
 
         <main
           className={clsx(
-            "flex min-w-0 flex-1 flex-col transition-[filter,opacity] duration-200",
+            "flex min-h-0 min-w-0 flex-1 flex-col transition-[filter,opacity] duration-200",
             profilePaused && "grayscale opacity-70",
           )}
         >
@@ -200,7 +200,7 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
             onProfileMenuCloseAutoFocus={handleProfileMenuCloseAutoFocus}
           />
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             <div
               className={clsx(
                 "mx-auto w-full max-w-6xl",
@@ -209,7 +209,17 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
             >
               {mode !== "popup" && <ProfileStatusCard />}
               <EditorSections mode={mode} />
-              <QuickAddActions mode={mode} />
+            </div>
+          </div>
+
+          <div className="shrink-0 bg-slate-100">
+            <div
+              className={clsx(
+                "mx-auto w-full max-w-6xl",
+                mode === "popup" ? "px-4 pb-4 pt-3" : "px-4 pb-5 pt-3 sm:px-6",
+              )}
+            >
+              <QuickAddActions />
             </div>
           </div>
         </main>

@@ -66,12 +66,12 @@ export function TabPicker({
               type="button"
               className={clsx(
                 "flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white text-left text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:border-[var(--theme-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] data-[state=open]:border-[var(--theme-color)]",
-                compact ? "h-8 px-2 text-xs" : "h-9 px-3 text-sm",
+                compact ? "h-8 px-2 text-xs" : "h-8 pr-2 pl-2.5 text-xs",
               )}
               aria-haspopup="listbox"
             >
               <TabIcon tab={selected} className={clsx(compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-              <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+              <span className="min-w-0 flex-1 truncate">{label}</span>
               {host && !compact && (
                 <span className="max-w-36 truncate text-xs text-slate-400">{host}</span>
               )}

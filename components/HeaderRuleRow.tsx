@@ -13,6 +13,14 @@ import {
   Trash2,
 } from "lucide-react";
 import type { AppendMode, HeaderRule } from "../modules/profile/domain/profile-model";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "./ui/combobox";
 import { Switch } from "./ui/switch";
 import { Input } from "./ui/input";
 import { useTranslation } from "react-i18next";
@@ -27,6 +35,7 @@ interface HeaderRuleRowProps {
   autoFocus?: boolean;
   searchQuery?: string;
   compact?: boolean;
+  nameSuggestions?: readonly string[];
 }
 
 function isSensitiveHeader(name: string) {
@@ -42,12 +51,20 @@ export function HeaderRuleRow({
   convertLabel,
   autoFocus,
   compact = false,
+  nameSuggestions = [],
 }: HeaderRuleRowProps) {
   const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
   const [showComment, setShowComment] = useState(Boolean(rule.comment));
   const commentRef = useRef<HTMLInputElement>(null);
   const sensitive = useMemo(() => isSensitiveHeader(rule.name), [rule.name]);
+  const selectedNameSuggestion = useMemo(() => {
+    const normalizedName = rule.name.trim().toLowerCase();
+    if (!normalizedName) return null;
+    return (
+      nameSuggestions.find((suggestion) => suggestion.toLowerCase() === normalizedName) ?? null
+    );
+  }, [nameSuggestions, rule.name]);
 
   useEffect(() => {
     if (rule.comment) setShowComment(true);
@@ -79,18 +96,44 @@ export function HeaderRuleRow({
           aria-label={`${rule.name || "Header"} ${rule.enabled ? t("common.enabled") : t("common.disabled")}`}
           className="shrink-0"
         />
-        <Input
-          aria-label={t("header.name")}
-          className={clsx(
-            compact ? "h-8" : "h-9",
-            "min-w-0 flex-[0.85] border-slate-200 bg-slate-50 font-mono text-xs shadow-none focus-visible:bg-white",
-          )}
-          placeholder={t("header.namePlaceholder")}
-          value={rule.name}
-          autoFocus={autoFocus && !rule.name}
-          onChange={(event) => onChange({ name: event.target.value })}
-          spellCheck={false}
-        />
+        <Combobox
+          items={nameSuggestions}
+          value={selectedNameSuggestion}
+          inputValue={rule.name}
+          autoComplete="off"
+          autoHighlight
+          onInputValueChange={(name, eventDetails) => {
+            if (eventDetails.reason === "input-change") onChange({ name });
+          }}
+          onValueChange={(name) => {
+            if (name !== null) onChange({ name });
+          }}
+        >
+          <ComboboxInput
+            aria-label={t("header.name")}
+            className={clsx(
+              compact ? "h-8" : "h-9",
+              "min-w-0 flex-[0.85] border-slate-200 bg-slate-50 shadow-none focus-within:bg-white [&_[data-slot=input-group-control]]:font-mono [&_[data-slot=input-group-control]]:text-xs",
+            )}
+            placeholder={t("header.namePlaceholder")}
+            autoFocus={autoFocus && !rule.name}
+            spellCheck={false}
+          />
+          <ComboboxContent sideOffset={4}>
+            <ComboboxEmpty className="px-3 text-left text-[11px] leading-4">
+              {t("header.noNameSuggestions")}
+            </ComboboxEmpty>
+            <ComboboxList className="max-h-60">
+              {(name) => (
+                <ComboboxItem key={name} value={name} className="py-2 font-mono text-xs">
+                  <span className="truncate" title={name}>
+                    {name}
+                  </span>
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
         <div className="relative min-w-0 flex-[1.4]">
           <Input
             aria-label={t("header.value")}
