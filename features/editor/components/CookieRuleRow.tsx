@@ -38,10 +38,7 @@ export function CookieRuleRow({
       />
       <input
         aria-label={t("cookie.name")}
-        className={clsx(
-          compact ? "h-8" : "h-9",
-          "min-w-0 flex-[0.85] rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-semibold outline-none transition hover:bg-white focus:ring-2 focus:ring-[var(--theme-color)]",
-        )}
+        className="h-8 min-w-0 flex-[0.85] rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-normal outline-none transition hover:bg-white focus:ring-2 focus:ring-[var(--theme-color)]"
         placeholder={t("cookie.namePlaceholder")}
         value={cookie.name}
         autoFocus={autoFocus}
@@ -50,10 +47,7 @@ export function CookieRuleRow({
       />
       <input
         aria-label={t("cookie.value")}
-        className={clsx(
-          compact ? "h-8" : "h-9",
-          "min-w-0 flex-[1.4] rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs outline-none transition hover:bg-white focus:ring-2 focus:ring-[var(--theme-color)]",
-        )}
+        className="h-8 min-w-0 flex-[1.4] rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-normal outline-none transition hover:bg-white focus:ring-2 focus:ring-[var(--theme-color)]"
         placeholder={t("cookie.valuePlaceholder")}
         value={cookie.value}
         onChange={(event) => onChange({ value: event.target.value })}

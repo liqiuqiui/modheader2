@@ -28,7 +28,7 @@ export function RedirectRuleRow({
       />
       <input
         aria-label={t("redirect.pattern")}
-        className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs outline-none focus:ring-2 focus:ring-[var(--theme-color)]"
+        className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-normal outline-none focus:ring-2 focus:ring-[var(--theme-color)]"
         placeholder={t("redirect.patternPlaceholder")}
         value={replacement.name}
         onChange={(event) => onChange({ name: event.target.value })}
@@ -36,7 +36,7 @@ export function RedirectRuleRow({
       <span className="text-slate-400">→</span>
       <input
         aria-label={t("redirect.target")}
-        className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs outline-none focus:ring-2 focus:ring-[var(--theme-color)]"
+        className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-normal outline-none focus:ring-2 focus:ring-[var(--theme-color)]"
         placeholder={t("redirect.targetPlaceholder")}
         value={replacement.value}
         onChange={(event) => onChange({ value: event.target.value })}

@@ -45,7 +45,7 @@ export function FilterValueEditor({
         ariaLabel={t("filter.methodLabel")}
         value={filter.value}
         onValueChange={onChange}
-        className="min-w-0 flex-1 font-semibold uppercase"
+        className="min-w-0 flex-1 uppercase"
         itemClassName={filterSelectTextClass}
         options={METHODS.map((method) => ({ value: method, label: method.toUpperCase() }))}
       />
@@ -76,7 +76,7 @@ export function FilterValueEditor({
         placeholder={placeholder}
         spellCheck={false}
         className={clsx(
-          "h-9 w-full rounded-lg border bg-slate-50 px-3 font-mono text-xs text-slate-700 outline-none transition hover:bg-white focus:ring-2",
+          "h-8 w-full rounded-lg border bg-slate-50 px-3 font-mono text-xs font-normal text-slate-700 outline-none transition hover:bg-white focus:ring-2",
           invalid
             ? "border-rose-300 focus:ring-rose-500/20"
             : "border-slate-200 focus:ring-[var(--theme-color)]",

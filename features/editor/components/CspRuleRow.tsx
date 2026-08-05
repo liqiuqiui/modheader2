@@ -77,10 +77,7 @@ export function CspRuleRow({
         <Input
           ref={directiveRef}
           aria-label={t("csp.directive")}
-          className={clsx(
-            compact ? "h-8" : "h-9",
-            "min-w-0 flex-[0.85] border-slate-200 bg-slate-50 font-mono text-xs shadow-none focus-visible:bg-white",
-          )}
+          className="h-8 min-w-0 flex-[0.85] border-slate-200 bg-slate-50 font-mono text-xs font-normal shadow-none focus-visible:bg-white"
           placeholder={t("csp.directivePlaceholder")}
           value={directive}
           onChange={(event) =>
@@ -91,10 +88,7 @@ export function CspRuleRow({
         <Input
           ref={directiveValueRef}
           aria-label={t("csp.value")}
-          className={clsx(
-            compact ? "h-8" : "h-9",
-            "min-w-0 flex-[1.4] border-slate-200 bg-slate-50 font-mono text-xs shadow-none focus-visible:bg-white",
-          )}
+          className="h-8 min-w-0 flex-[1.4] border-slate-200 bg-slate-50 font-mono text-xs font-normal shadow-none focus-visible:bg-white"
           placeholder={t("csp.valuePlaceholder")}
           value={directiveValue}
           onChange={(event) => onChange({ value: joinCspDirective(directive, event.target.value) })}
@@ -161,7 +155,7 @@ export function CspRuleRow({
           <Input
             ref={commentRef}
             aria-label={t("csp.comment")}
-            className="h-7 border-dashed border-slate-200 bg-transparent text-xs text-slate-500 shadow-none"
+            className="h-8 border-dashed border-slate-200 bg-transparent text-xs font-normal text-slate-500 shadow-none"
             placeholder={t("csp.commentPlaceholder")}
             value={rule.comment}
             onChange={(event) => onChange({ comment: event.target.value })}

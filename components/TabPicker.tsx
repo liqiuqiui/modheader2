@@ -65,8 +65,8 @@ export function TabPicker({
             <button
               type="button"
               className={clsx(
-                "flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white text-left text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:border-[var(--theme-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] data-[state=open]:border-[var(--theme-color)]",
-                compact ? "h-8 px-2 text-xs" : "h-8 pr-2 pl-2.5 text-xs",
+                "flex h-8 w-full items-center gap-2 rounded-lg border border-slate-200 bg-white text-left text-xs font-normal text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:border-[var(--theme-color)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-color)] data-[state=open]:border-[var(--theme-color)]",
+                compact ? "px-2" : "pr-2 pl-2.5",
               )}
               aria-haspopup="listbox"
             >
@@ -122,7 +122,7 @@ export function TabPicker({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t("tab.search")}
-                className="min-w-0 flex-1 bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400"
+                className="min-w-0 flex-1 bg-transparent text-xs font-normal text-slate-800 outline-none placeholder:text-slate-400"
               />
               {query && (
                 <button
@@ -170,7 +170,7 @@ export function TabPicker({
                   >
                     <TabIcon tab={tab} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-medium">
+                      <span className="block truncate text-xs font-normal">
                         {tab.title || t("tab.untitled")}
                       </span>
                       <span className="block truncate text-[11px] text-slate-400">

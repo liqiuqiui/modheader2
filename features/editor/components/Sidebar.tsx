@@ -136,13 +136,13 @@ export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => 
             <Search aria-hidden="true" className="h-4 w-4" />
           </button>
         ) : (
-          <label className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-2.5 focus-within:border-[var(--theme-color)] focus-within:ring-2 focus-within:ring-[var(--theme-color)]">
+          <label className="flex h-8 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-2.5 focus-within:border-[var(--theme-color)] focus-within:ring-2 focus-within:ring-[var(--theme-color)]">
             <Search aria-hidden="true" className="h-4 w-4 text-slate-400" />
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder={t("nav.searchRules")}
-              className="min-w-0 flex-1 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+              className="min-w-0 flex-1 bg-transparent text-xs font-normal text-slate-700 outline-none placeholder:text-slate-400"
             />
             {searchQuery && (
               <button

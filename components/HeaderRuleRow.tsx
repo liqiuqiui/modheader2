@@ -21,8 +21,16 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "./ui/combobox";
-import { Switch } from "./ui/switch";
 import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Switch } from "./ui/switch";
 import { useTranslation } from "react-i18next";
 
 interface HeaderRuleRowProps {
@@ -111,10 +119,7 @@ export function HeaderRuleRow({
         >
           <ComboboxInput
             aria-label={t("header.name")}
-            className={clsx(
-              compact ? "h-8" : "h-9",
-              "min-w-0 flex-[0.85] border-slate-200 bg-slate-50 shadow-none focus-within:bg-white [&_[data-slot=input-group-control]]:font-mono [&_[data-slot=input-group-control]]:text-xs",
-            )}
+            className="h-8 min-w-0 flex-[0.85] border-slate-200 bg-slate-50 shadow-none focus-within:bg-white [&_[data-slot=input-group-control]]:font-mono"
             placeholder={t("header.namePlaceholder")}
             autoFocus={autoFocus && !rule.name}
             spellCheck={false}
@@ -138,10 +143,7 @@ export function HeaderRuleRow({
           <Input
             aria-label={t("header.value")}
             type={sensitive && !revealed ? "password" : "text"}
-            className={clsx(
-              compact ? "h-8" : "h-9",
-              "border-slate-200 bg-slate-50 pr-9 font-mono text-xs shadow-none focus-visible:bg-white",
-            )}
+            className="h-8 border-slate-200 bg-slate-50 pr-9 font-mono text-xs font-normal shadow-none focus-visible:bg-white"
             placeholder={t("header.valuePlaceholder")}
             value={rule.value}
             autoFocus={autoFocus && Boolean(rule.name)}
@@ -164,18 +166,26 @@ export function HeaderRuleRow({
           )}
         </div>
         {!compact && (
-          <select
-            aria-label={t("header.mode")}
-            className="h-9 shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[11px] text-slate-600 outline-none transition hover:bg-white focus:ring-2 focus:ring-[var(--theme-color)]"
+          <Select
             value={rule.appendMode}
-            onChange={(event) => onChange({ appendMode: event.target.value as AppendMode })}
+            onValueChange={(appendMode) => onChange({ appendMode: appendMode as AppendMode })}
           >
-            {appendModes.map((mode) => (
-              <option key={mode.value} value={mode.value}>
-                {mode.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              aria-label={t("header.mode")}
+              className="h-8 shrink-0 border-slate-200 bg-slate-50 text-xs font-normal text-slate-600 shadow-none hover:bg-white"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {appendModes.map((mode) => (
+                  <SelectItem key={mode.value} value={mode.value}>
+                    {mode.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         )}
         <button
           type="button"
@@ -246,7 +256,7 @@ export function HeaderRuleRow({
           <Input
             ref={commentRef}
             aria-label={t("header.comment")}
-            className="h-7 border-dashed border-slate-200 bg-transparent text-xs text-slate-500 shadow-none"
+            className="h-8 border-dashed border-slate-200 bg-transparent text-xs font-normal text-slate-500 shadow-none"
             placeholder={t("header.commentPlaceholder")}
             value={rule.comment}
             onChange={(event) => onChange({ comment: event.target.value })}
