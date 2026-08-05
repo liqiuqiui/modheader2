@@ -169,13 +169,28 @@ export default defineBackground(() => {
     { urls: ["<all_urls>"] },
   );
 
+  browser.webRequest.onCompleted.addListener(
+    (details) => {
+      void profileActionBadgeController.observeTabComplete(details.tabId).catch(console.error);
+    },
+    { urls: ["<all_urls>"], types: ["main_frame"] },
+  );
+
   browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (!changeInfo.url) return;
-    void profileActionBadgeController.observeTabUrl(tabId, changeInfo.url).catch(console.error);
+    if (changeInfo.url) {
+      void profileActionBadgeController.observeTabUrl(tabId, changeInfo.url).catch(console.error);
+    }
+    if (changeInfo.status === "complete") {
+      void profileActionBadgeController.observeTabComplete(tabId).catch(console.error);
+    }
+  });
+
+  browser.tabs.onActivated.addListener(({ tabId }) => {
+    void profileActionBadgeController.observeTabActivated(tabId).catch(console.error);
   });
 
   browser.tabs.onRemoved.addListener((tabId) => {
-    profileActionBadgeController.forgetTab(tabId);
+    void profileActionBadgeController.forgetTab(tabId).catch(console.error);
   });
 
   browser.contextMenus.onClicked.addListener((info) => {
