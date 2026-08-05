@@ -288,6 +288,26 @@ describe("Profile action badge", () => {
     expect(browserMock.state.globalBadgeText).toBe("");
   });
 
+  it("re-evaluates a recorded hit when a tab filter targets the current tab", async () => {
+    const profile = matchingProfile();
+    const controller = new ProfileActionBadgeController();
+    await controller.sync(profile, compileProfileDnrRules(profile).rules);
+    await controller.observeRequest(request());
+
+    const tabFilter = createProfileFilter({ id: "current-tab", kind: "tab", currentTabId: 7 });
+    const filteredProfile = {
+      ...profile,
+      filters: {
+        byId: { ...profile.filters.byId, [tabFilter.id]: tabFilter },
+        order: [...profile.filters.order, tabFilter.id],
+      },
+    };
+    await controller.sync(filteredProfile, compileProfileDnrRules(filteredProfile).rules);
+
+    expect(browserMock.state.tabBadgeTexts.get(7)).toBe("1");
+    expect(browserMock.state.globalBadgeText).toBe("1");
+  });
+
   it("restores per-tab hits after a service worker restart", async () => {
     const profile = matchingProfile();
     const rules = compileProfileDnrRules(profile).rules;
