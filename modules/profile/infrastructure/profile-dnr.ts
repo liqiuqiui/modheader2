@@ -74,6 +74,35 @@ function isEffectiveHeaderRule(rule: HeaderRule): boolean {
   return Boolean(rule.enabled && rule.name.trim() && (rule.value || rule.sendEmptyHeader));
 }
 
+function isEffectiveCspDirectiveRule(rule: HeaderRule): boolean {
+  return Boolean(
+    rule.enabled &&
+    isCspDirectiveRule(rule) &&
+    (createCspDirectiveValue(rule) || rule.sendEmptyHeader),
+  );
+}
+
+function isEffectiveCookieRule(cookie: CookieRule): boolean {
+  return Boolean(cookie.enabled && cookie.name.trim());
+}
+
+function isEffectiveUrlReplacement(replacement: UrlReplacement): boolean {
+  return Boolean(replacement.enabled && replacement.name.trim() && replacement.value.trim());
+}
+
+export function countEnabledProfileModifications(profile?: Profile): number {
+  if (!profile?.enabled || profile.paused) return 0;
+
+  return (
+    profile.headers.filter(isEffectiveHeaderRule).length +
+    profile.respHeaders.filter((rule) =>
+      isCspDirectiveRule(rule) ? isEffectiveCspDirectiveRule(rule) : isEffectiveHeaderRule(rule),
+    ).length +
+    profile.cookies.filter(isEffectiveCookieRule).length +
+    profile.urlReplacements.filter(isEffectiveUrlReplacement).length
+  );
+}
+
 function activeFilters(profile: Profile): ProfileFilter[] {
   return orderedProfileFilters(profile).filter((filter) => filter.enabled);
 }
@@ -244,12 +273,7 @@ function contentSecurityPolicyToDnr(
   urlFilter?: UrlProfileFilter,
 ): PendingProfileDnrRule | null {
   const value = createContentSecurityPolicyValue(rules);
-  const effectiveRules = rules.filter(
-    (rule) =>
-      rule.enabled &&
-      isCspDirectiveRule(rule) &&
-      (Boolean(createCspDirectiveValue(rule)) || rule.sendEmptyHeader),
-  );
+  const effectiveRules = rules.filter(isEffectiveCspDirectiveRule);
   if (!value && effectiveRules.length === 0) return null;
 
   return {
@@ -273,7 +297,7 @@ function cookiesToDnr(
   urlFilter?: UrlProfileFilter,
 ): PendingProfileDnrRule | null {
   const value = cookies
-    .filter((cookie) => cookie.enabled && cookie.name.trim())
+    .filter(isEffectiveCookieRule)
     .map((cookie) => `${cookie.name.trim()}=${cookie.value}`)
     .join("; ");
   if (!value) return null;
@@ -292,7 +316,7 @@ function urlReplacementToDnr(
   condition: DnrCondition,
 ): PendingProfileDnrRule | null {
   const regexFilter = replacement.name.trim();
-  if (!replacement.enabled || !regexFilter || !replacement.value.trim()) return null;
+  if (!isEffectiveUrlReplacement(replacement)) return null;
 
   return {
     action: {
@@ -340,9 +364,7 @@ export function compileProfileDnrRules(profile?: Profile): ProfileDnrCompilation
   const urlResult = compileUrlFilters(filters);
   if ("error" in urlResult) return failedCompilation(urlResult.error);
 
-  const enabledReplacements = profile.urlReplacements.filter(
-    (replacement) => replacement.enabled && replacement.name.trim() && replacement.value.trim(),
-  );
+  const enabledReplacements = profile.urlReplacements.filter(isEffectiveUrlReplacement);
   if (
     enabledReplacements.some(
       (replacement) =>

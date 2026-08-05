@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createCookieRule,
   createCspRule,
   createHeaderRule,
   createProfile,
@@ -9,6 +10,7 @@ import { createProfileFilter } from "../../domain/profile-filter";
 import type { Profile, ProfileFilter } from "../../domain/profile-model";
 import {
   compileProfileDnrRules,
+  countEnabledProfileModifications,
   MAX_PROFILE_DNR_RULES,
   PROFILE_DNR_RULE_ID_BASE,
   profileToDnrRules,
@@ -69,6 +71,60 @@ const invalidEnabledIncludes: Array<{
 ];
 
 describe("Profile DNR compilation", () => {
+  it("counts effective enabled modification rows instead of compiled DNR rules", () => {
+    const profile = {
+      ...profileWithFilters([
+        {
+          ...createProfileFilter({ id: "include-one", kind: "urlPattern" }),
+          value: "*://one.example/*",
+        },
+        {
+          ...createProfileFilter({ id: "include-two", kind: "urlPattern" }),
+          value: "*://two.example/*",
+        },
+      ]),
+      headers: [
+        createHeaderRule({ id: "request-active", name: "authorization", value: "token" }),
+        createHeaderRule({ id: "request-draft", name: "", value: "draft" }),
+        createHeaderRule({
+          id: "request-empty",
+          name: "x-empty",
+          value: "",
+          sendEmptyHeader: true,
+        }),
+      ],
+      respHeaders: [
+        createHeaderRule({ id: "response-active", name: "x-response", value: "1" }),
+        createCspRule({ id: "csp-active", value: "default-src 'self'" }),
+        createCspRule({ id: "csp-draft", value: "\t'self'" }),
+      ],
+      cookies: [
+        createCookieRule({ id: "cookie-active", name: "session", value: "" }),
+        createCookieRule({ id: "cookie-disabled", name: "ignored", enabled: false }),
+      ],
+      urlReplacements: [
+        createUrlReplacement({
+          id: "redirect-active",
+          name: "^https://old\\.example/(.*)$",
+          value: "https://new.example/$1",
+        }),
+        createUrlReplacement({ id: "redirect-draft", name: "^https://draft\\.example/" }),
+      ],
+    };
+
+    expect(countEnabledProfileModifications(profile)).toBe(6);
+    expect(compileProfileDnrRules({ ...profile, urlReplacements: [] }).rules).toHaveLength(10);
+  });
+
+  it("counts no modifications while the profile is disabled or paused", () => {
+    const profile = profileWithFilters([]);
+
+    expect(countEnabledProfileModifications(profile)).toBe(1);
+    expect(countEnabledProfileModifications({ ...profile, enabled: false })).toBe(0);
+    expect(countEnabledProfileModifications({ ...profile, paused: true })).toBe(0);
+    expect(countEnabledProfileModifications()).toBe(0);
+  });
+
   it("returns no rules for disabled or paused profiles", () => {
     const profile = profileWithFilters([]);
 

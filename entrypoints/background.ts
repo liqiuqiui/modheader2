@@ -11,6 +11,7 @@ import {
   applyDnrRules,
   compileProfileDnrRules,
 } from "../modules/profile/infrastructure/profile-dnr";
+import { profileActionBadgeController } from "../modules/profile/infrastructure/profile-action-badge";
 import {
   isProfileCommandMessage,
   type ProfileCommandResponse,
@@ -40,7 +41,13 @@ async function syncRules() {
       `Profile DNR compilation failed for ${profile?.id ?? "no selected profile"}: ${compilation.diagnostics.join("; ")}`,
     );
   }
-  await applyDnrRules(compilation.rules);
+  try {
+    await applyDnrRules(compilation.rules);
+  } catch (error) {
+    await profileActionBadgeController.sync(profile, []).catch(console.error);
+    throw error;
+  }
+  await profileActionBadgeController.sync(profile, compilation.rules);
 }
 
 async function syncContextMenu() {
@@ -152,6 +159,23 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message) => {
     if (!isProfileCommandMessage(message)) return undefined;
     return handleProfileCommand(message.command, message.clientId);
+  });
+
+  browser.webRequest.onBeforeRequest.addListener(
+    (details) => {
+      void profileActionBadgeController.observeRequest(details).catch(console.error);
+      return undefined;
+    },
+    { urls: ["<all_urls>"] },
+  );
+
+  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (!changeInfo.url) return;
+    void profileActionBadgeController.observeTabUrl(tabId, changeInfo.url).catch(console.error);
+  });
+
+  browser.tabs.onRemoved.addListener((tabId) => {
+    profileActionBadgeController.forgetTab(tabId);
   });
 
   browser.contextMenus.onClicked.addListener((info) => {

@@ -30,6 +30,7 @@ export default defineConfig({
       "storage",
       "declarativeNetRequest",
       "declarativeNetRequestWithHostAccess",
+      "webRequest",
       "tabs",
       "scripting",
       "contextMenus",
