@@ -38,11 +38,6 @@ const invalidEnabledIncludes: Array<{
   diagnostic: string;
 }> = [
   {
-    label: "empty URL pattern",
-    filter: createProfileFilter({ id: "empty-url", kind: "urlPattern" }),
-    diagnostic: "An enabled URL filter is empty or contains non-ASCII characters",
-  },
-  {
     label: "invalid URL regular expression",
     filter: {
       ...createProfileFilter({ id: "invalid-regex", kind: "urlRegex" }),
@@ -51,22 +46,12 @@ const invalidEnabledIncludes: Array<{
     diagnostic: "An enabled URL regex filter is invalid",
   },
   {
-    label: "empty initiator",
-    filter: createProfileFilter({ id: "empty-initiator", kind: "initiator" }),
-    diagnostic: "An enabled initiator filter has an invalid domain",
-  },
-  {
     label: "invalid initiator",
     filter: {
       ...createProfileFilter({ id: "invalid-initiator", kind: "initiator" }),
       value: "https://example.com",
     },
     diagnostic: "An enabled initiator filter has an invalid domain",
-  },
-  {
-    label: "unresolved tab",
-    filter: createProfileFilter({ id: "unresolved-tab", kind: "tab" }),
-    diagnostic: "An enabled tab filter has no valid tab",
   },
 ];
 
@@ -216,6 +201,19 @@ describe("Profile DNR compilation", () => {
       enabled: false,
     };
     const compilation = compileProfileDnrRules(profileWithFilters([filter]));
+
+    expect(compilation.diagnostics).toEqual([]);
+    expect(compilation.rules).toHaveLength(1);
+  });
+
+  it("ignores enabled filters without a value", () => {
+    const compilation = compileProfileDnrRules(
+      profileWithFilters([
+        createProfileFilter({ id: "empty-url", kind: "urlPattern" }),
+        createProfileFilter({ id: "empty-initiator", kind: "initiator" }),
+        createProfileFilter({ id: "unresolved-tab", kind: "tab" }),
+      ]),
+    );
 
     expect(compilation.diagnostics).toEqual([]);
     expect(compilation.rules).toHaveLength(1);

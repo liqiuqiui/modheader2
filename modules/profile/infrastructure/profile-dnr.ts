@@ -1,3 +1,4 @@
+import { isEmpty, isNil } from "lodash-es";
 import { browser, type Browser } from "wxt/browser";
 import {
   CONTENT_SECURITY_POLICY_HEADER,
@@ -104,7 +105,12 @@ export function countEnabledProfileModifications(profile?: Profile): number {
 }
 
 function activeFilters(profile: Profile): ProfileFilter[] {
-  return orderedProfileFilters(profile).filter((filter) => filter.enabled);
+  return orderedProfileFilters(profile).filter(
+    (filter) =>
+      filter.enabled &&
+      !isNil(filter.value) &&
+      (typeof filter.value !== "string" || !isEmpty(filter.value.trim())),
+  );
 }
 
 function compileProfileCondition(
