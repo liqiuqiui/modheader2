@@ -46,7 +46,7 @@ export function FilterSection({
   const clearFilters = useProfileStore((state) => state.clearFilters);
   const [open, setOpen] = useState(true);
   const [showAddPanel, setShowAddPanel] = useState(false);
-  const [draftKind, setDraftKind] = useState<FilterKind>("urlPattern");
+  const [draftKind, setDraftKind] = useState<FilterKind>("tab");
   const [draftMode, setDraftMode] = useState<FilterMode>("include");
   const [localFocusFilterId, setLocalFocusFilterId] = useState<string | null>(null);
   const filters = useMemo(() => orderedProfileFilters(profile), [profile]);
@@ -86,7 +86,7 @@ export function FilterSection({
     setShowAddPanel((current) => {
       const next = !current;
       if (next) {
-        setDraftKind("urlPattern");
+        setDraftKind("tab");
         setDraftMode("include");
       }
       return next;

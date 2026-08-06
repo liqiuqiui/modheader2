@@ -28,13 +28,13 @@ export function LanguageMenu({
         <DropdownMenu.Content
           align="end"
           sideOffset={8}
-          className="z-[100] min-w-36 rounded-xl border border-slate-200 bg-white p-1.5 text-slate-800 shadow-xl"
+          className="z-100 min-w-36 rounded-xl border border-slate-200 bg-white p-1.5 text-slate-800 shadow-xl"
         >
           <DropdownMenu.Item className={menuItemClass} onSelect={() => onLanguageChange("zh-CN")}>
-            <span className="w-5 text-center">中</span> {t("common.chinese")}
+            <span className="w-5 text-center whitespace-nowrap">{t("common.chinese")}</span>
           </DropdownMenu.Item>
           <DropdownMenu.Item className={menuItemClass} onSelect={() => onLanguageChange("en")}>
-            <span className="w-5 text-center">EN</span> {t("common.english")}
+            <span className="w-5 text-center whitespace-nowrap">{t("common.english")}</span>
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
