@@ -1,4 +1,5 @@
-import { arrayMoveImmutable } from "array-move";
+import { isEmpty, isMatch } from "lodash-es";
+import { moveItemById } from "./profile-collections";
 import {
   createProfileFilter,
   isFilterKind,
@@ -8,11 +9,8 @@ import {
   orderedProfileFilters,
 } from "./profile-filter";
 import type { Profile, ProfileFilter } from "./profile-model";
+import { isRecord } from "./profile-guards";
 import { profileHasEntityId } from "./profile-operations";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function applyFilterPatch(
   filter: ProfileFilter,
@@ -27,14 +25,10 @@ function applyFilterPatch(
     sanitized.value = patch.value;
   }
   if (typeof patch.comment === "string") sanitized.comment = patch.comment;
-  if (Object.keys(sanitized).length === 0) return filter;
+  if (isEmpty(sanitized)) return filter;
   const candidate = { ...filter, ...sanitized, id: filter.id, kind: filter.kind };
   if (!isProfileFilter(candidate)) return filter;
-  return Object.entries(sanitized).every(
-    ([key, value]) => filter[key as keyof ProfileFilter] === value,
-  )
-    ? filter
-    : candidate;
+  return isMatch(filter, sanitized) ? filter : candidate;
 }
 
 export function addProfileFilter(profile: Profile, filter: unknown): Profile {
@@ -108,14 +102,13 @@ export function reorderProfileFilters(
   sourceFilterId: string,
   targetFilterId: string,
 ): Profile {
-  const sourceIndex = profile.filters.order.indexOf(sourceFilterId);
-  const targetIndex = profile.filters.order.indexOf(targetFilterId);
-  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return profile;
+  const order = moveItemById(profile.filters.order, sourceFilterId, targetFilterId);
+  if (order === profile.filters.order) return profile;
   return {
     ...profile,
     filters: {
       ...profile.filters,
-      order: arrayMoveImmutable(profile.filters.order, sourceIndex, targetIndex),
+      order,
     },
   };
 }

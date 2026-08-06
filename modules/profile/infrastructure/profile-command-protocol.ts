@@ -2,6 +2,15 @@ import type { ProfileCommand } from "../application/profile-command";
 import { isCspDirectiveRule } from "../domain/profile-csp";
 import type { ProfileDocument } from "../domain/profile-document";
 import { isFilterKind, isFilterMode, isProfileFilter } from "../domain/profile-filter";
+import {
+  hasOnlyKeys,
+  isArrayOf,
+  isAppendMode,
+  isNonEmptyString,
+  isNonNegativeInteger,
+  isProfileRuleCollection,
+  isRecord,
+} from "../domain/profile-guards";
 import type { ProfileRuleCollection } from "../domain/profile-model";
 import {
   isCookieRule,
@@ -23,32 +32,6 @@ export interface ProfileCommandMessage {
 export type ProfileCommandResponse =
   | { ok: true; document: ProfileDocument }
   | { ok: false; error: string };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
-}
-
-function isNonNegativeInteger(value: unknown): value is number {
-  return Number.isInteger(value) && (value as number) >= 0;
-}
-
-function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  return Object.keys(value).every((key) => keys.includes(key));
-}
-
-function isProfileRuleCollection(value: unknown): value is ProfileRuleCollection {
-  return (
-    value === "headers" ||
-    value === "respHeaders" ||
-    value === "csp" ||
-    value === "cookies" ||
-    value === "urlReplacements"
-  );
-}
 
 function isProfileMetadataPatch(value: unknown): boolean {
   if (
@@ -72,10 +55,6 @@ function isProfileRule(collection: ProfileRuleCollection, value: unknown): boole
   if (collection === "headers" || collection === "respHeaders") return isHeaderRule(value);
   if (collection === "cookies") return isCookieRule(value);
   return isUrlReplacement(value);
-}
-
-function isAppendMode(value: unknown): boolean {
-  return value === "override" || value === "append" || value === "comma";
 }
 
 function isProfileRulePatch(collection: ProfileRuleCollection, value: unknown): boolean {
@@ -147,7 +126,7 @@ function isProfileCommand(value: unknown): value is ProfileCommand {
     case "deleteProfile":
       return isNonEmptyString(value.profileId) && isProfile(value.replacement);
     case "importProfiles":
-      return Array.isArray(value.profiles) && value.profiles.every(isProfile);
+      return isArrayOf(value.profiles, isProfile);
     case "addRule":
       return (
         isNonEmptyString(value.profileId) &&

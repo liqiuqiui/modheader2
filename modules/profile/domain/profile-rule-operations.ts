@@ -1,5 +1,5 @@
+import { isEmpty, isMatch } from "lodash-es";
 import type {
-  AppendMode,
   CookieRule,
   HeaderRule,
   Profile,
@@ -8,21 +8,13 @@ import type {
   UrlReplacement,
 } from "./profile-model";
 import { CONTENT_SECURITY_POLICY_HEADER, isContentSecurityPolicyRule } from "./profile-csp";
+import {
+  isAppendMode,
+  isNonEmptyString,
+  isProfileRuleCollection,
+  isRecord,
+} from "./profile-guards";
 import { profileHasEntityId } from "./profile-operations";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isRuleCollection(value: unknown): value is ProfileRuleCollection {
-  return (
-    value === "headers" ||
-    value === "respHeaders" ||
-    value === "csp" ||
-    value === "cookies" ||
-    value === "urlReplacements"
-  );
-}
 
 function ruleCollection(profile: Profile, collection: ProfileRuleCollection): ProfileRule[] {
   if (collection === "headers") return profile.headers;
@@ -98,10 +90,6 @@ function replaceRuleCollection(
   return { ...profile, urlReplacements: rules as UrlReplacement[] };
 }
 
-function isAppendMode(value: unknown): value is AppendMode {
-  return value === "override" || value === "append" || value === "comma";
-}
-
 function sanitizedRulePatch(
   collection: ProfileRuleCollection,
   patch: unknown,
@@ -124,10 +112,9 @@ function sanitizedRulePatch(
 
 export function addProfileRule(profile: Profile, collection: unknown, rule: unknown): Profile {
   if (
-    !isRuleCollection(collection) ||
+    !isProfileRuleCollection(collection) ||
     !isRecord(rule) ||
-    typeof rule.id !== "string" ||
-    rule.id.length === 0 ||
+    !isNonEmptyString(rule.id) ||
     profileHasEntityId(profile, rule.id)
   ) {
     return profile;
@@ -152,17 +139,12 @@ export function patchProfileRule(
   ruleId: string,
   patch: unknown,
 ): Profile {
-  if (!isRuleCollection(collection)) return profile;
+  if (!isProfileRuleCollection(collection)) return profile;
   const located = locateRule(profile, collection, ruleId);
   if (!located) return profile;
   const rules = ruleCollection(profile, located.collection);
   const sanitized = sanitizedRulePatch(located.collection, patch);
-  if (
-    Object.keys(sanitized).length === 0 ||
-    Object.entries(sanitized).every(
-      ([key, value]) => located.rule[key as keyof ProfileRule] === value,
-    )
-  ) {
+  if (isEmpty(sanitized) || isMatch(located.rule, sanitized)) {
     return profile;
   }
   return replaceRuleCollection(
@@ -175,7 +157,7 @@ export function patchProfileRule(
 }
 
 export function deleteProfileRule(profile: Profile, collection: unknown, ruleId: string): Profile {
-  if (!isRuleCollection(collection)) return profile;
+  if (!isProfileRuleCollection(collection)) return profile;
   const located = locateRule(profile, collection, ruleId);
   if (!located) return profile;
   return replaceRuleCollection(
@@ -192,9 +174,8 @@ export function cloneProfileRule(
   cloneId: string,
 ): Profile {
   if (
-    !isRuleCollection(collection) ||
-    typeof cloneId !== "string" ||
-    cloneId.length === 0 ||
+    !isProfileRuleCollection(collection) ||
+    !isNonEmptyString(cloneId) ||
     profileHasEntityId(profile, cloneId)
   ) {
     return profile;
@@ -212,7 +193,7 @@ export function setProfileRulesEnabled(
   collection: unknown,
   enabled: unknown,
 ): Profile {
-  if (!isRuleCollection(collection) || typeof enabled !== "boolean") return profile;
+  if (!isProfileRuleCollection(collection) || typeof enabled !== "boolean") return profile;
   const rules = ruleCollection(profile, collection);
   if (rules.every((rule) => rule.enabled === enabled)) return profile;
   return replaceRuleCollection(
@@ -223,7 +204,7 @@ export function setProfileRulesEnabled(
 }
 
 export function clearProfileRules(profile: Profile, collection: unknown): Profile {
-  if (!isRuleCollection(collection) || ruleCollection(profile, collection).length === 0) {
+  if (!isProfileRuleCollection(collection) || ruleCollection(profile, collection).length === 0) {
     return profile;
   }
   return replaceRuleCollection(profile, collection, []);

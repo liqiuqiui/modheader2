@@ -9,15 +9,12 @@ import type {
   ResourceType,
 } from "./profile-model";
 import { FILTER_KINDS, FILTER_MODES, REQUEST_METHODS, RESOURCE_TYPES } from "./profile-model";
+import { isNonEmptyString, isNonNegativeInteger, isRecord } from "./profile-guards";
 
 const FILTER_KIND_SET = new Set<string>(FILTER_KINDS);
 const FILTER_MODE_SET = new Set<string>(FILTER_MODES);
 const REQUEST_METHOD_SET = new Set<string>(REQUEST_METHODS);
 const RESOURCE_TYPE_SET = new Set<string>(RESOURCE_TYPES);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 export function isRequestMethod(value: unknown): value is RequestMethod {
   return typeof value === "string" && REQUEST_METHOD_SET.has(value);
@@ -37,7 +34,7 @@ export function isFilterMode(value: unknown): value is FilterMode {
 
 export function isFilterValue(kind: FilterKind, value: unknown): value is ProfileFilter["value"] {
   if (kind === "tab") {
-    return value === null || (Number.isInteger(value) && (value as number) >= 0);
+    return value === null || isNonNegativeInteger(value);
   }
   if (kind === "resourceType") return isResourceType(value);
   if (kind === "method") return isRequestMethod(value);
@@ -47,8 +44,7 @@ export function isFilterValue(kind: FilterKind, value: unknown): value is Profil
 export function isProfileFilter(value: unknown): value is ProfileFilter {
   if (
     !isRecord(value) ||
-    typeof value.id !== "string" ||
-    value.id.length === 0 ||
+    !isNonEmptyString(value.id) ||
     typeof value.enabled !== "boolean" ||
     !isFilterKind(value.kind) ||
     !isFilterMode(value.mode) ||
@@ -72,7 +68,7 @@ export function createProfileFilter<K extends FilterKind>({
 }): ProfileFilterByKind<K> {
   const common = { id, enabled: true, mode, comment: "" };
   if (kind === "tab") {
-    const value = Number.isInteger(currentTabId) && currentTabId! >= 0 ? currentTabId! : null;
+    const value = isNonNegativeInteger(currentTabId) ? currentTabId : null;
     return { ...common, kind, value } as ProfileFilterByKind<K>;
   }
   if (kind === "resourceType") {

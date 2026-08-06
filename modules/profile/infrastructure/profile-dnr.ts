@@ -1,4 +1,4 @@
-import { isEmpty, isNil } from "lodash-es";
+import { isEmpty, isNil, uniq } from "lodash-es";
 import { browser, type Browser } from "wxt/browser";
 import {
   CONTENT_SECURITY_POLICY_HEADER,
@@ -8,6 +8,7 @@ import {
   isCspDirectiveRule,
 } from "../domain/profile-csp";
 import { orderedProfileFilters } from "../domain/profile-filter";
+import { isNonNegativeInteger } from "../domain/profile-guards";
 import type {
   CookieRule,
   HeaderRule,
@@ -35,10 +36,6 @@ const MANAGED_PROFILE_RULE_IDS = Array.from(
   { length: MAX_PROFILE_DNR_RULES },
   (_, index) => PROFILE_DNR_RULE_ID_BASE + index,
 );
-
-function unique<T>(values: T[]): T[] {
-  return [...new Set(values)];
-}
 
 function failedCompilation(message: string): ProfileDnrCompilation {
   return { rules: [], diagnostics: [message] };
@@ -122,7 +119,7 @@ function compileProfileCondition(
     (filter): filter is Extract<ProfileFilter, { kind: "resourceType" }> =>
       filter.kind === "resourceType",
   );
-  const includedResources = unique(
+  const includedResources = uniq(
     resourceTypeFilters.filter((filter) => filter.mode === "include").map((filter) => filter.value),
   );
   const excludedResources = new Set(
@@ -143,7 +140,7 @@ function compileProfileCondition(
   const requestMethodFilters = filters.filter(
     (filter): filter is Extract<ProfileFilter, { kind: "method" }> => filter.kind === "method",
   );
-  const includedMethods = unique(
+  const includedMethods = uniq(
     requestMethodFilters
       .filter((filter) => filter.mode === "include")
       .map((filter) => filter.value),
@@ -168,19 +165,15 @@ function compileProfileCondition(
   const tabIdFilters = filters.filter(
     (filter): filter is Extract<ProfileFilter, { kind: "tab" }> => filter.kind === "tab",
   );
-  if (
-    tabIdFilters.some(
-      (filter) => filter.value === null || !Number.isInteger(filter.value) || filter.value < 0,
-    )
-  ) {
+  if (tabIdFilters.some((filter) => filter.value === null || !isNonNegativeInteger(filter.value))) {
     return { error: "An enabled tab filter has no valid tab" };
   }
-  const includedTabIds = unique(
+  const includedTabIds = uniq(
     tabIdFilters
       .filter((filter) => filter.mode === "include")
       .map((filter) => filter.value as number),
   );
-  const excludedTabIds = unique(
+  const excludedTabIds = uniq(
     tabIdFilters
       .filter((filter) => filter.mode === "exclude")
       .map((filter) => filter.value as number),
@@ -199,12 +192,12 @@ function compileProfileCondition(
   if (normalizedInitiators.some((filter) => !isInitiatorDomain(filter.value))) {
     return { error: "An enabled initiator filter has an invalid domain" };
   }
-  const initiatorDomains = unique(
+  const initiatorDomains = uniq(
     normalizedInitiators
       .filter((filter) => filter.mode === "include")
       .map((filter) => filter.value),
   );
-  const excludedInitiatorDomains = unique(
+  const excludedInitiatorDomains = uniq(
     normalizedInitiators
       .filter((filter) => filter.mode === "exclude")
       .map((filter) => filter.value),

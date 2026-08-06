@@ -1,4 +1,6 @@
-import { arrayMoveImmutable } from "array-move";
+import { isArray, isEmpty } from "lodash-es";
+import { moveItemById } from "../domain/profile-collections";
+import { isNonEmptyString, isNonNegativeInteger } from "../domain/profile-guards";
 import {
   addProfileFilter,
   changeProfileFilterKind,
@@ -121,14 +123,17 @@ function reduceProfileCommandDocument(
   }
 
   if (command.type === "reorderProfiles") {
-    const sourceIndex = current.profileOrder.indexOf(command.sourceProfileId);
-    const targetIndex = current.profileOrder.indexOf(command.targetProfileId);
-    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return current;
+    const profileOrder = moveItemById(
+      current.profileOrder,
+      command.sourceProfileId,
+      command.targetProfileId,
+    );
+    if (profileOrder === current.profileOrder) return current;
     return nextDocument(
       current,
       {
         profilesById: current.profilesById,
-        profileOrder: arrayMoveImmutable(current.profileOrder, sourceIndex, targetIndex),
+        profileOrder,
         selectedProfileId: current.selectedProfileId,
       },
       sourceId,
@@ -153,12 +158,10 @@ function reduceProfileCommandDocument(
   if (command.type === "cloneProfile") {
     if (
       !Object.hasOwn(current.profilesById, command.sourceProfileId) ||
-      typeof command.cloneId !== "string" ||
-      command.cloneId.length === 0 ||
+      !isNonEmptyString(command.cloneId) ||
       Object.hasOwn(current.profilesById, command.cloneId) ||
       typeof command.title !== "string" ||
-      typeof command.backgroundColor !== "string" ||
-      command.backgroundColor.length === 0
+      !isNonEmptyString(command.backgroundColor)
     ) {
       return current;
     }
@@ -206,7 +209,7 @@ function reduceProfileCommandDocument(
   }
 
   if (command.type === "importProfiles") {
-    if (!Array.isArray(command.profiles) || command.profiles.length === 0) return current;
+    if (!isArray(command.profiles) || isEmpty(command.profiles)) return current;
     const profilesById = { ...current.profilesById };
     const importedProfiles = command.profiles.filter((profile) => {
       if (!isProfile(profile) || Object.hasOwn(profilesById, profile.id)) return false;
@@ -331,10 +334,7 @@ export function reduceProfileCommand(
     command.type === "clearFilters" ||
     command.type === "replaceSnapshot";
   const expectedRevision = expectedProfileCommandRevision(command);
-  if (
-    requiresExpectedRevision &&
-    (!Number.isInteger(expectedRevision) || (expectedRevision as number) < 0)
-  ) {
+  if (requiresExpectedRevision && !isNonNegativeInteger(expectedRevision)) {
     return { status: "noop", document: current };
   }
   if (expectedRevision !== undefined && expectedRevision !== current.revision) {

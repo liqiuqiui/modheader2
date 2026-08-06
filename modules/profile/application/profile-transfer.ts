@@ -1,4 +1,5 @@
 import { PROFILE_DOCUMENT_SCHEMA_VERSION } from "../domain/profile-document";
+import { isArrayOf, isRecord } from "../domain/profile-guards";
 import type { Profile } from "../domain/profile-model";
 import { isProfile } from "../domain/profile-validation";
 
@@ -12,13 +13,11 @@ export function createProfileExportDocument(profiles: Profile[]): ProfileExportD
 }
 
 export function parseProfileExportDocument(value: unknown): Profile[] | null {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    (value as Record<string, unknown>).schemaVersion !== PROFILE_DOCUMENT_SCHEMA_VERSION
-  ) {
+  if (!isRecord(value)) {
     return null;
   }
-  const profiles = (value as Record<string, unknown>).profiles;
-  return Array.isArray(profiles) && profiles.every(isProfile) ? profiles : null;
+  const document = value as Record<string, unknown>;
+  if (document.schemaVersion !== PROFILE_DOCUMENT_SCHEMA_VERSION) return null;
+  const profiles = document.profiles;
+  return isArrayOf(profiles, isProfile) ? profiles : null;
 }

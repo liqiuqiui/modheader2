@@ -1,4 +1,6 @@
+import { isArray } from "lodash-es";
 import { browser } from "wxt/browser";
+import { isArrayOf, isNonNegativeInteger, isRecord } from "../domain/profile-guards";
 import type { Profile } from "../domain/profile-model";
 import { countEnabledProfileModifications, type ProfileDnrRule } from "./profile-dnr";
 import {
@@ -6,6 +8,7 @@ import {
   type ProfileRequestDetails,
   type ProfileRequestMatcher,
 } from "./profile-request-match";
+import { isHttpUrl } from "./profile-url-utils";
 
 const RUNTIME_STATE_STORAGE_KEY = "profile-action-badge-runtime-state-v5";
 const MAX_PENDING_EVENTS = 500;
@@ -50,35 +53,23 @@ function getRequestScopeKey(profile: Profile | undefined): string {
   return JSON.stringify({ profileId: profile.id, filters, redirectPatterns });
 }
 
-function isHttpPageUrl(url: string): boolean {
-  try {
-    const protocol = new URL(url).protocol;
-    return protocol === "http:" || protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function isTabId(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function readTabIds(value: unknown): number[] | null {
-  return Array.isArray(value) && value.every(isTabId) ? value : null;
+  return isArrayOf(value, isNonNegativeInteger) ? value : null;
 }
 
 function readTabEntries<Value>(
   value: unknown,
   isValue: (value: unknown) => value is Value,
 ): TabEntry<Value>[] | null {
-  if (!Array.isArray(value)) return null;
+  if (!isArray(value)) return null;
   const entries: TabEntry<Value>[] = [];
   for (const entry of value) {
-    if (!Array.isArray(entry) || entry.length !== 2 || !isTabId(entry[0]) || !isValue(entry[1])) {
+    if (
+      !isArray(entry) ||
+      entry.length !== 2 ||
+      !isNonNegativeInteger(entry[0]) ||
+      !isValue(entry[1])
+    ) {
       return null;
     }
     entries.push([entry[0], entry[1]] as TabEntry<Value>);
@@ -92,7 +83,7 @@ function isProfileRequestDetails(value: unknown): value is ProfileRequestDetails
     (value.initiator === undefined || typeof value.initiator === "string") &&
     typeof value.method === "string" &&
     typeof value.requestId === "string" &&
-    isTabId(value.tabId) &&
+    isNonNegativeInteger(value.tabId) &&
     typeof value.type === "string" &&
     typeof value.url === "string"
   );
@@ -244,7 +235,7 @@ export class ProfileActionBadgeController {
   }
 
   private async applyTabUrl(tabId: number, url: string): Promise<void> {
-    if (isHttpPageUrl(url)) return;
+    if (isHttpUrl(url)) return;
     const stateChanged = this.clearTabTracking(tabId);
     await Promise.all([
       this.renderTabBadge(tabId, ""),
@@ -293,7 +284,7 @@ export class ProfileActionBadgeController {
     );
     const eligibleMatchedTabIds = new Set(
       tabs.flatMap((tab) =>
-        typeof tab.id === "number" && (typeof tab.url !== "string" || isHttpPageUrl(tab.url))
+        typeof tab.id === "number" && (typeof tab.url !== "string" || isHttpUrl(tab.url))
           ? [tab.id]
           : [],
       ),
@@ -402,7 +393,7 @@ export class ProfileActionBadgeController {
     try {
       const stored = await browser.storage.session.get(RUNTIME_STATE_STORAGE_KEY);
       const value = stored[RUNTIME_STATE_STORAGE_KEY];
-      if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+      if (!isRecord(value)) return null;
       const record = value as Record<string, unknown>;
       const matchedTabIds = readTabIds(record.matchedTabIds);
       const matchedRequests = readTabRequestEntries(record.matchedRequests);

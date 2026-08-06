@@ -1,5 +1,6 @@
 import type { Browser } from "wxt/browser";
 import type { ProfileDnrRule } from "./profile-dnr";
+import { isHttpUrl } from "./profile-url-utils";
 
 export type ProfileRequestDetails = Pick<
   Browser.webRequest.OnBeforeRequestDetails,
@@ -78,15 +79,6 @@ function matchesAnyDomain(hostname: string | null, domains?: string[]): boolean 
   return Boolean(hostname && domains?.some((domain) => hostnameMatchesDomain(hostname, domain)));
 }
 
-function isHttpRequest(url: string): boolean {
-  try {
-    const protocol = new URL(url).protocol;
-    return protocol === "http:" || protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 function createConditionMatcher(rule: ProfileDnrRule): ProfileRequestMatcher {
   const { condition } = rule;
   const matchesUrl = createUrlMatcher(condition);
@@ -103,7 +95,7 @@ function createConditionMatcher(rule: ProfileDnrRule): ProfileRequestMatcher {
     if (excludedResourceTypes.has(request.type)) return false;
 
     const method = request.method.toLowerCase();
-    const httpRequest = isHttpRequest(request.url);
+    const httpRequest = isHttpUrl(request.url);
     if (requestMethods.size > 0 && (!httpRequest || !requestMethods.has(method))) return false;
     if (httpRequest && excludedRequestMethods.has(method)) return false;
 

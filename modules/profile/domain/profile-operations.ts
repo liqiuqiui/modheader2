@@ -1,20 +1,20 @@
+import { isEmpty } from "lodash-es";
 import type { Profile, ProfileMetadataPatch } from "./profile-model";
 import { getProfileShortTitle, getProfileTextColor } from "./profile-appearance";
+import { isRecord } from "./profile-guards";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+export function profileEntityIds(profile: Profile): string[] {
+  return [
+    ...profile.headers.map((entity) => entity.id),
+    ...profile.respHeaders.map((entity) => entity.id),
+    ...profile.cookies.map((entity) => entity.id),
+    ...profile.urlReplacements.map((entity) => entity.id),
+    ...profile.filters.order,
+  ];
 }
 
 export function profileHasEntityId(profile: Profile, entityId: string): boolean {
-  return (
-    Object.hasOwn(profile.filters.byId, entityId) ||
-    [
-      ...profile.headers,
-      ...profile.respHeaders,
-      ...profile.cookies,
-      ...profile.urlReplacements,
-    ].some((entity) => entity.id === entityId)
-  );
+  return profileEntityIds(profile).includes(entityId);
 }
 
 export function applyProfileMetadataPatch(profile: Profile, patch: unknown): Profile {
@@ -39,7 +39,7 @@ export function applyProfileMetadataPatch(profile: Profile, patch: unknown): Pro
   if (typeof patch.hideComment === "boolean" && patch.hideComment !== profile.hideComment) {
     changes.hideComment = patch.hideComment;
   }
-  if (Object.keys(changes).length === 0) return profile;
+  if (isEmpty(changes)) return profile;
   const next = { ...profile, ...changes };
   if (changes.title !== undefined) next.shortTitle = getProfileShortTitle(changes.title);
   if (changes.backgroundColor !== undefined) {
