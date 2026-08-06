@@ -1,6 +1,7 @@
 import { clsx } from "clsx";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { GripVertical, X } from "lucide-react";
+import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../../../components/ui/switch";
 import {
@@ -16,7 +17,7 @@ import { FilterSelect } from "./FilterSelect";
 import { FilterValueEditor } from "./FilterValueEditor";
 import { filterSelectTextClass } from "./styles";
 
-export function FilterRow({
+function FilterRowComponent({
   filter,
   tabs,
   currentTabId,
@@ -31,9 +32,9 @@ export function FilterRow({
   filter: ProfileFilter;
   tabs: BrowserTab[];
   currentTabId?: number;
-  onPatch: (patch: ProfileFilterPatch) => void;
-  onKindChange: (kind: FilterKind) => void;
-  onDelete: () => void;
+  onPatch: (filterId: string, kind: FilterKind, patch: ProfileFilterPatch) => void;
+  onKindChange: (filterId: string, kind: FilterKind) => void;
+  onDelete: (filterId: string) => void;
   autoFocusValue?: boolean;
   sortableIndex: number;
   sortableDisabled?: boolean;
@@ -41,6 +42,18 @@ export function FilterRow({
 }) {
   const { t, i18n } = useTranslation();
   const isEnglish = i18n.resolvedLanguage === "en";
+  const modeOptions = useMemo(
+    () =>
+      FILTER_MODES.map((mode) => ({
+        value: mode,
+        label: t(mode === "include" ? "filter.include" : "filter.exclude"),
+      })),
+    [i18n.resolvedLanguage, t],
+  );
+  const kindOptions = useMemo(
+    () => FILTER_KINDS.map((kind) => ({ value: kind, label: t(FILTER_LABEL_KEYS[kind]) })),
+    [i18n.resolvedLanguage, t],
+  );
   const { ref, handleRef, isDragging } = useSortable({
     id: filter.id,
     index: sortableIndex,
@@ -68,43 +81,37 @@ export function FilterRow({
         </button>
         <Switch
           checked={filter.enabled}
-          onCheckedChange={(enabled) => onPatch({ enabled })}
+          onCheckedChange={(enabled) => onPatch(filter.id, filter.kind, { enabled })}
           aria-label={t("filter.enable")}
           className="mt-2 shrink-0"
         />
         <FilterSelect
           ariaLabel={t("filter.modeLabel")}
           value={filter.mode}
-          onValueChange={(mode) => onPatch({ mode })}
+          onValueChange={(mode) => onPatch(filter.id, filter.kind, { mode })}
           className={clsx("shrink-0", filterSelectTextClass, isEnglish ? "w-24" : "w-[84px]")}
           itemClassName={filterSelectTextClass}
-          options={FILTER_MODES.map((mode) => ({
-            value: mode,
-            label: t(mode === "include" ? "filter.include" : "filter.exclude"),
-          }))}
+          options={modeOptions}
         />
         <FilterSelect
           ariaLabel={t("filter.typeLabel")}
           value={filter.kind}
-          onValueChange={onKindChange}
+          onValueChange={(kind) => onKindChange(filter.id, kind)}
           className={clsx("shrink-0", filterSelectTextClass, isEnglish ? "w-36" : "w-[122px]")}
           itemClassName={filterSelectTextClass}
-          options={FILTER_KINDS.map((kind) => ({
-            value: kind,
-            label: t(FILTER_LABEL_KEYS[kind]),
-          }))}
+          options={kindOptions}
         />
         <FilterValueEditor
           filter={filter}
           tabs={tabs}
           currentTabId={currentTabId}
           autoFocus={autoFocusValue}
-          onChange={(value) => onPatch({ value })}
+          onChange={(value) => onPatch(filter.id, filter.kind, { value })}
         />
         <button
           type="button"
           aria-label={t("filter.delete")}
-          onClick={onDelete}
+          onClick={() => onDelete(filter.id)}
           className="mt-0.5 rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
         >
           <X aria-hidden="true" className="h-4 w-4" />
@@ -113,3 +120,5 @@ export function FilterRow({
     </div>
   );
 }
+
+export const FilterRow = memo(FilterRowComponent);

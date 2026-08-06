@@ -11,15 +11,20 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
+import {
+  getProfileShortTitle,
+  getProfileTextColor,
+} from "../../../modules/profile/domain/profile-appearance";
 import type { Profile } from "../../../modules/profile/domain/profile-model";
 import { selectOrderedProfiles } from "../../../modules/profile/state/profile-selectors";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
 import { useEditorUiStore } from "../stores/editor-ui-store";
 import type { EditorMode } from "../types";
 
-function SortableProfileItem({
+const SortableProfileItem = memo(function SortableProfileItem({
   collapsed,
   profile,
   index,
@@ -33,6 +38,8 @@ function SortableProfileItem({
   onSelect: (profileId: string) => void;
 }) {
   const { ref, isDragging } = useSortable({ id: profile.id, index });
+  const badgeLabel = getProfileShortTitle(profile.title);
+  const foregroundColor = getProfileTextColor(profile.backgroundColor);
 
   return (
     <button
@@ -49,9 +56,9 @@ function SortableProfileItem({
     >
       <span
         className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold shadow-sm"
-        style={{ backgroundColor: profile.backgroundColor, color: profile.textColor }}
+        style={{ backgroundColor: profile.backgroundColor, color: foregroundColor }}
       >
-        {profile.shortTitle}
+        {badgeLabel}
         <span
           className={clsx(
             "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white",
@@ -64,7 +71,7 @@ function SortableProfileItem({
       )}
     </button>
   );
-}
+});
 
 export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => void }) {
   const { t } = useTranslation();
@@ -172,7 +179,7 @@ export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => 
                 profile={profile}
                 index={index}
                 selected={profile.id === selectedProfileId}
-                onSelect={(profileId) => void selectProfile(profileId)}
+                onSelect={selectProfile}
               />
             ))}
           </div>

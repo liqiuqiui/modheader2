@@ -17,9 +17,9 @@ import {
   type ProfileCommandResponse,
 } from "../modules/profile/infrastructure/profile-command-protocol";
 import {
-  profileStateStorage,
   readStoredProfileDocument,
   type ProfileDocument,
+  watchStoredProfileDocument,
   writeStoredProfileDocument,
 } from "../modules/profile/infrastructure/profile-storage";
 
@@ -29,8 +29,10 @@ const BACKGROUND_SOURCE_ID = nanoid();
 let documentMutationQueue: Promise<void> = Promise.resolve();
 
 function selectedProfile(document: ProfileDocument) {
-  if (!document.selectedProfileId) return undefined;
-  return document.profilesById[document.selectedProfileId];
+  const profileId = document.state.selectedProfileId;
+  return profileId
+    ? document.state.profiles.find((profile) => profile.id === profileId)
+    : undefined;
 }
 
 async function syncRules() {
@@ -150,7 +152,7 @@ export default defineBackground(() => {
   scheduleRulesSync();
   void createContextMenu().then(scheduleContextMenuSync).catch(console.error);
 
-  profileStateStorage.watch(() => {
+  watchStoredProfileDocument(() => {
     scheduleRulesSync();
     scheduleContextMenuSync();
   });
@@ -169,17 +171,13 @@ export default defineBackground(() => {
     { urls: ["<all_urls>"] },
   );
 
-  browser.webRequest.onCompleted.addListener(
-    (details) => {
-      void profileActionBadgeController.observeTabComplete(details.tabId).catch(console.error);
-    },
-    { urls: ["<all_urls>"], types: ["main_frame"] },
-  );
-
   browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.url) {
       void profileActionBadgeController.observeTabUrl(tabId, changeInfo.url).catch(console.error);
     }
+    // tabs.onUpdated is the single completion signal for badge rendering.
+    // webRequest.onCompleted used to call the same method for main-frame
+    // requests, causing duplicate badge writes for every navigation.
     if (changeInfo.status === "complete") {
       void profileActionBadgeController.observeTabComplete(tabId).catch(console.error);
     }
@@ -197,9 +195,9 @@ export default defineBackground(() => {
     if (info.menuItemId !== CONTEXT_MENU_ID) return;
     void enqueueDocumentTask(async () => {
       const current = await readStoredProfileDocument();
-      const profileId = current.selectedProfileId;
+      const profileId = current.state.selectedProfileId;
       if (!profileId) return;
-      const profile = current.profilesById[profileId];
+      const profile = current.state.profiles.find((candidate) => candidate.id === profileId);
       if (!profile) return;
       const result = reduceProfileCommand(
         current,

@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import { FileUp, Maximize2, Pause, Play, Plus, Redo2, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
+import { getProfileTextColor } from "../../../modules/profile/domain/profile-appearance";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
 import { useEditorUiStore } from "../stores/editor-ui-store";
 import { LanguageMenu } from "./LanguageMenu";
@@ -35,21 +36,20 @@ export function EditorToolbar({
   const { t } = useTranslation();
   const profile = useProfileStore(
     useShallow((state) => {
-      const selected = state.selectedProfileId
-        ? state.profilesById[state.selectedProfileId]
-        : undefined;
+      const selectedIndex = state.selectedProfileId
+        ? state.profiles.findIndex((profile) => profile.id === state.selectedProfileId)
+        : -1;
+      const selected = state.profiles[selectedIndex];
       if (!selected) return null;
       return {
         id: selected.id,
         title: selected.title,
         backgroundColor: selected.backgroundColor,
-        textColor: selected.textColor,
+        foregroundColor: getProfileTextColor(selected.backgroundColor),
         paused: selected.paused,
+        number: selectedIndex + 1,
       };
     }),
-  );
-  const profileNumber = useProfileStore((state) =>
-    state.selectedProfileId ? state.profileOrder.indexOf(state.selectedProfileId) + 1 : 0,
   );
   const canUndo = useProfileStore((state) => state.past.length > 0);
   const canRedo = useProfileStore((state) => state.future.length > 0);
@@ -70,10 +70,10 @@ export function EditorToolbar({
   return (
     <header
       className="flex h-14 shrink-0 items-center gap-2 px-4 shadow-sm"
-      style={{ backgroundColor: profile.backgroundColor, color: profile.textColor }}
+      style={{ backgroundColor: profile.backgroundColor, color: profile.foregroundColor }}
     >
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/40 text-xs font-semibold">
-        {profileNumber}
+        {profile.number}
       </span>
       <input
         ref={titleRef}

@@ -1,15 +1,13 @@
-import { isEmpty, isMatch } from "lodash-es";
-import { moveItemById } from "./profile-collections";
+import { moveEntityById } from "./profile-collections";
 import {
   createProfileFilter,
   isFilterKind,
   isFilterMode,
   isFilterValue,
   isProfileFilter,
-  orderedProfileFilters,
 } from "./profile-filter";
-import type { Profile, ProfileFilter } from "./profile-model";
 import { isRecord } from "./profile-guards";
+import type { Profile, ProfileFilter } from "./profile-model";
 import { profileHasEntityId } from "./profile-operations";
 
 function applyFilterPatch(
@@ -18,6 +16,7 @@ function applyFilterPatch(
   patch: unknown,
 ): ProfileFilter {
   if (!isFilterKind(expectedKind) || !isRecord(patch)) return filter;
+
   const sanitized: Record<string, unknown> = {};
   if (typeof patch.enabled === "boolean") sanitized.enabled = patch.enabled;
   if (isFilterMode(patch.mode)) sanitized.mode = patch.mode;
@@ -25,21 +24,23 @@ function applyFilterPatch(
     sanitized.value = patch.value;
   }
   if (typeof patch.comment === "string") sanitized.comment = patch.comment;
-  if (isEmpty(sanitized)) return filter;
+
+  if (
+    Object.keys(sanitized).length === 0 ||
+    Object.entries(sanitized).every(([key, value]) =>
+      Object.is(filter[key as keyof ProfileFilter], value),
+    )
+  ) {
+    return filter;
+  }
+
   const candidate = { ...filter, ...sanitized, id: filter.id, kind: filter.kind };
-  if (!isProfileFilter(candidate)) return filter;
-  return isMatch(filter, sanitized) ? filter : candidate;
+  return isProfileFilter(candidate) ? candidate : filter;
 }
 
 export function addProfileFilter(profile: Profile, filter: unknown): Profile {
   if (!isProfileFilter(filter) || profileHasEntityId(profile, filter.id)) return profile;
-  return {
-    ...profile,
-    filters: {
-      byId: { ...profile.filters.byId, [filter.id]: filter },
-      order: [...profile.filters.order, filter.id],
-    },
-  };
+  return { ...profile, filters: [...profile.filters, filter] };
 }
 
 export function patchProfileFilter(
@@ -48,17 +49,14 @@ export function patchProfileFilter(
   expectedKind: unknown,
   patch: unknown,
 ): Profile {
-  if (!Object.hasOwn(profile.filters.byId, filterId)) return profile;
-  const filter = profile.filters.byId[filterId];
+  const index = profile.filters.findIndex((filter) => filter.id === filterId);
+  if (index < 0) return profile;
+  const filter = profile.filters[index];
   const nextFilter = applyFilterPatch(filter, expectedKind, patch);
   if (nextFilter === filter) return profile;
-  return {
-    ...profile,
-    filters: {
-      ...profile.filters,
-      byId: { ...profile.filters.byId, [filterId]: nextFilter },
-    },
-  };
+  const filters = [...profile.filters];
+  filters[index] = nextFilter;
+  return { ...profile, filters };
 }
 
 export function changeProfileFilterKind(
@@ -67,34 +65,24 @@ export function changeProfileFilterKind(
   kind: unknown,
   currentTabId?: number,
 ): Profile {
-  if (!Object.hasOwn(profile.filters.byId, filterId)) return profile;
-  const filter = profile.filters.byId[filterId];
+  const index = profile.filters.findIndex((filter) => filter.id === filterId);
+  if (index < 0) return profile;
+  const filter = profile.filters[index];
   if (!isFilterKind(kind) || kind === filter.kind) return profile;
+
   const nextFilter = {
     ...createProfileFilter({ id: filterId, kind, mode: filter.mode, currentTabId }),
     enabled: filter.enabled,
     comment: filter.comment,
   };
-  return {
-    ...profile,
-    filters: {
-      ...profile.filters,
-      byId: { ...profile.filters.byId, [filterId]: nextFilter },
-    },
-  };
+  const filters = [...profile.filters];
+  filters[index] = nextFilter;
+  return { ...profile, filters };
 }
 
 export function deleteProfileFilter(profile: Profile, filterId: string): Profile {
-  if (!Object.hasOwn(profile.filters.byId, filterId)) return profile;
-  const byId = { ...profile.filters.byId };
-  delete byId[filterId];
-  return {
-    ...profile,
-    filters: {
-      byId,
-      order: profile.filters.order.filter((id) => id !== filterId),
-    },
-  };
+  const filters = profile.filters.filter((filter) => filter.id !== filterId);
+  return filters.length === profile.filters.length ? profile : { ...profile, filters };
 }
 
 export function reorderProfileFilters(
@@ -102,33 +90,27 @@ export function reorderProfileFilters(
   sourceFilterId: string,
   targetFilterId: string,
 ): Profile {
-  const order = moveItemById(profile.filters.order, sourceFilterId, targetFilterId);
-  if (order === profile.filters.order) return profile;
-  return {
-    ...profile,
-    filters: {
-      ...profile.filters,
-      order,
-    },
-  };
+  const filters = moveEntityById(profile.filters, sourceFilterId, targetFilterId);
+  return filters === profile.filters ? profile : { ...profile, filters };
 }
 
 export function setProfileFiltersEnabled(profile: Profile, enabled: unknown): Profile {
-  if (typeof enabled !== "boolean") return profile;
-  let changed = false;
-  const byId = { ...profile.filters.byId };
-  for (const filterId of profile.filters.order) {
-    const filter = byId[filterId];
-    if (!filter || filter.enabled === enabled) continue;
-    byId[filterId] = { ...filter, enabled };
-    changed = true;
+  if (
+    typeof enabled !== "boolean" ||
+    profile.filters.every((filter) => filter.enabled === enabled)
+  ) {
+    return profile;
   }
-  return changed ? { ...profile, filters: { ...profile.filters, byId } } : profile;
+  return {
+    ...profile,
+    filters: profile.filters.map((filter) =>
+      filter.enabled === enabled ? filter : { ...filter, enabled },
+    ),
+  };
 }
 
 export function clearProfileFilters(profile: Profile): Profile {
-  if (profile.filters.order.length === 0) return profile;
-  return { ...profile, filters: { byId: {}, order: [] } };
+  return profile.filters.length === 0 ? profile : { ...profile, filters: [] };
 }
 
 function filterSortGroup(filter: ProfileFilter): number {
@@ -142,14 +124,11 @@ function filterSortGroup(filter: ProfileFilter): number {
 }
 
 export function sortProfileFilters(profile: Profile): Profile {
-  const sorted = [...orderedProfileFilters(profile)].sort(
+  const filters = [...profile.filters].sort(
     (left, right) =>
       filterSortGroup(left) - filterSortGroup(right) ||
       String(left.value).localeCompare(String(right.value)),
   );
-  const order = sorted.map((filter) => filter.id);
-  if (order.every((filterId, index) => profile.filters.order[index] === filterId)) {
-    return profile;
-  }
-  return { ...profile, filters: { ...profile.filters, order } };
+  const unchanged = filters.every((filter, index) => profile.filters[index]?.id === filter.id);
+  return unchanged ? profile : { ...profile, filters };
 }

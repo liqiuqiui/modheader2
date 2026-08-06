@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createEmptyProfileDocument,
   createInitialProfileDocument,
+  type ProfileDocument,
 } from "../../domain/profile-document";
 import { createHeaderRule, createProfile } from "../../domain/profile-factory";
 import { createProfileFilter } from "../../domain/profile-filter";
@@ -10,30 +11,49 @@ import type { ProfileCommand } from "../profile-command";
 import { reduceProfileCommand, type ProfileCommandResult } from "../reduce-profile-command";
 
 function profileWithHeader(): Profile {
+  const profile = createProfile({
+    title: "Test",
+    id: "profile-1",
+    backgroundColor: "#2563eb",
+  });
   return {
-    ...createProfile({ title: "Test", id: "profile-1", backgroundColor: "#2563eb" }),
-    headers: [createHeaderRule({ id: "header-1", name: "x-test", value: "before" })],
+    ...profile,
+    rules: {
+      ...profile.rules,
+      requestHeaders: [createHeaderRule({ id: "header-1", name: "x-test", value: "before" })],
+    },
   };
 }
 
-function applied(result: ProfileCommandResult) {
+function applied(result: ProfileCommandResult): ProfileDocument {
   expect(result.status).toBe("applied");
   return result.document;
 }
 
-describe("reduceProfileCommand", () => {
-  it("initializes schema v2 once and increments revision exactly once", () => {
-    const profile = profileWithHeader();
-    const first = reduceProfileCommand(
-      createEmptyProfileDocument(),
-      { type: "initialize", profile },
-      "client-a",
-    );
-    const initialized = applied(first);
+function profileOf(document: ProfileDocument, profileId = "profile-1"): Profile {
+  const profile = document.state.profiles.find((item) => item.id === profileId);
+  expect(profile).toBeDefined();
+  return profile as Profile;
+}
 
-    expect(initialized.revision).toBe(1);
-    expect(initialized.sourceId).toBe("client-a");
-    expect(initialized.selectedProfileId).toBe(profile.id);
+describe("reduceProfileCommand", () => {
+  it("initializes schema 1 once and increments revision exactly once", () => {
+    const profile = profileWithHeader();
+    const initialized = applied(
+      reduceProfileCommand(
+        createEmptyProfileDocument(),
+        { type: "initialize", profile },
+        "client-a",
+      ),
+    );
+
+    expect(initialized).toMatchObject({
+      schemaVersion: 1,
+      revision: 1,
+      sourceId: "client-a",
+      state: { profiles: [profile], selectedProfileId: profile.id },
+    });
+
     const second = reduceProfileCommand(
       initialized,
       { type: "initialize", profile: createProfile({ title: "Ignored" }) },
@@ -66,7 +86,7 @@ describe("reduceProfileCommand", () => {
       {
         type: "clearRules",
         profileId: "profile-1",
-        collection: "headers",
+        collection: "requestHeaders",
         expectedRevision: 6,
       },
       "client-a",
@@ -85,35 +105,54 @@ describe("reduceProfileCommand", () => {
     const malformed = {
       type: "clearRules",
       profileId: "profile-1",
-      collection: "headers",
+      collection: "requestHeaders",
     } as unknown as ProfileCommand;
+
     const result = reduceProfileCommand(document, malformed, "client-a");
 
     expect(result).toEqual({ status: "noop", document });
-    expect(result.document).toBe(document);
   });
 
-  it("does not let snapshot payloads override document metadata", () => {
+  it("accepts only a strict state payload for history replacement", () => {
     const document = createInitialProfileDocument(profileWithHeader(), "seed", 7);
-    const snapshot = {
-      profilesById: document.profilesById,
-      profileOrder: document.profileOrder,
-      selectedProfileId: document.selectedProfileId,
+    const malformedState = {
+      ...document.state,
       revision: 1,
       sourceId: "injected",
-      schemaVersion: 1,
     };
-    const result = reduceProfileCommand(
+
+    const rejected = reduceProfileCommand(
       document,
       {
-        type: "replaceSnapshot",
-        snapshot: snapshot as never,
+        type: "replaceState",
+        state: malformedState as never,
         expectedRevision: document.revision,
       },
       "client-a",
     );
+    expect(rejected).toEqual({ status: "noop", document });
 
-    expect(result).toEqual({ status: "noop", document });
+    const replacement = createProfile({
+      id: "profile-2",
+      title: "Replacement",
+      backgroundColor: "#16a34a",
+    });
+    const replaced = applied(
+      reduceProfileCommand(
+        document,
+        {
+          type: "replaceState",
+          state: { profiles: [replacement], selectedProfileId: replacement.id },
+          expectedRevision: document.revision,
+        },
+        "client-a",
+      ),
+    );
+    expect(replaced).toMatchObject({
+      revision: 8,
+      sourceId: "client-a",
+      state: { profiles: [replacement], selectedProfileId: replacement.id },
+    });
   });
 
   it("merges entity-level patch and add commands in either order", () => {
@@ -121,14 +160,14 @@ describe("reduceProfileCommand", () => {
     const patch: ProfileCommand = {
       type: "patchRule",
       profileId: "profile-1",
-      collection: "headers",
+      collection: "requestHeaders",
       ruleId: "header-1",
       patch: { value: "after" },
     };
     const add: ProfileCommand = {
       type: "addRule",
       profileId: "profile-1",
-      collection: "headers",
+      collection: "requestHeaders",
       rule: createHeaderRule({ id: "header-2", name: "x-added", value: "2" }),
     };
 
@@ -140,7 +179,7 @@ describe("reduceProfileCommand", () => {
     );
 
     for (const document of [patchThenAdd, addThenPatch]) {
-      expect(document.profilesById["profile-1"].headers).toEqual([
+      expect(profileOf(document).rules.requestHeaders).toEqual([
         expect.objectContaining({ id: "header-1", value: "after" }),
         expect.objectContaining({ id: "header-2", value: "2" }),
       ]);
@@ -154,12 +193,12 @@ describe("reduceProfileCommand", () => {
       type: "convertHeader",
       profileId: "profile-1",
       ruleId: "header-1",
-      target: "respHeaders",
+      target: "responseHeaders",
     };
     const staleCollectionPatch: ProfileCommand = {
       type: "patchRule",
       profileId: "profile-1",
-      collection: "headers",
+      collection: "requestHeaders",
       ruleId: "header-1",
       patch: { value: "after" },
     };
@@ -180,15 +219,90 @@ describe("reduceProfileCommand", () => {
     );
 
     for (const document of [convertedThenPatched, patchedThenConverted]) {
-      const profile = document.profilesById["profile-1"];
-      expect(profile.headers).toEqual([]);
-      expect(profile.respHeaders).toEqual([
+      const profile = profileOf(document);
+      expect(profile.rules.requestHeaders).toEqual([]);
+      expect(profile.rules.responseHeaders).toEqual([
         expect.objectContaining({ id: "header-1", value: "after" }),
       ]);
     }
   });
 
-  it("updates normalized filters without replacing another command's entities", () => {
+  it("moves a response CSP header into the dedicated CSP collection", () => {
+    const initialProfile = profileWithHeader();
+    initialProfile.rules.requestHeaders = [];
+    initialProfile.rules.responseHeaders = [
+      createHeaderRule({ id: "response-1", name: "x-frame-options", value: "DENY" }),
+    ];
+    const initial = createInitialProfileDocument(initialProfile, "seed", 1);
+
+    const document = applied(
+      reduceProfileCommand(
+        initial,
+        {
+          type: "patchRule",
+          profileId: initialProfile.id,
+          collection: "responseHeaders",
+          ruleId: "response-1",
+          patch: {
+            name: "Content-Security-Policy",
+            value: "default-src 'self'",
+          },
+        },
+        "client-a",
+      ),
+    );
+
+    const profile = profileOf(document);
+    expect(profile.rules.responseHeaders).toEqual([]);
+    expect(profile.rules.csp).toEqual([
+      expect.objectContaining({
+        id: "response-1",
+        directive: "default-src",
+        value: "'self'",
+      }),
+    ]);
+  });
+
+  it("uses the replacement only when deleting the final profile", () => {
+    const first = profileWithHeader();
+    const second = createProfile({
+      id: "profile-2",
+      title: "Second",
+      backgroundColor: "#16a34a",
+    });
+    const replacement = createProfile({
+      id: "profile-3",
+      title: "Replacement",
+      backgroundColor: "#0f766e",
+    });
+    const withTwoProfiles = {
+      ...createInitialProfileDocument(first, "seed", 1),
+      state: { profiles: [first, second], selectedProfileId: first.id },
+    };
+
+    const deleted = applied(
+      reduceProfileCommand(
+        withTwoProfiles,
+        { type: "deleteProfile", profileId: first.id, replacement },
+        "client-a",
+      ),
+    );
+    expect(deleted.state).toEqual({ profiles: [second], selectedProfileId: second.id });
+
+    const replaced = applied(
+      reduceProfileCommand(
+        deleted,
+        { type: "deleteProfile", profileId: second.id, replacement },
+        "client-a",
+      ),
+    );
+    expect(replaced.state).toEqual({
+      profiles: [replacement],
+      selectedProfileId: replacement.id,
+    });
+  });
+
+  it("updates array filters without replacing sibling entities", () => {
     const initial = createInitialProfileDocument(profileWithHeader(), "seed", 1);
     const first = createProfileFilter({ id: "filter-1", kind: "method" });
     const second = createProfileFilter({ id: "filter-2", kind: "resourceType" });
@@ -220,9 +334,7 @@ describe("reduceProfileCommand", () => {
       ),
     );
 
-    expect(patched.profilesById["profile-1"].filters.order).toEqual([first.id, second.id]);
-    expect(patched.profilesById["profile-1"].filters.byId[first.id].mode).toBe("exclude");
-    expect(patched.profilesById["profile-1"].filters.byId[second.id]).toEqual(second);
+    expect(profileOf(patched).filters).toEqual([{ ...first, mode: "exclude" }, second]);
   });
 
   it("makes stale filter value patches commute with kind changes", () => {
@@ -231,7 +343,7 @@ describe("reduceProfileCommand", () => {
       value: "*://before/*",
     };
     const initialProfile = profileWithHeader();
-    initialProfile.filters = { byId: { [filter.id]: filter }, order: [filter.id] };
+    initialProfile.filters = [filter];
     const initial = createInitialProfileDocument(initialProfile, "seed", 1);
     const changeKind: ProfileCommand = {
       type: "changeFilterKind",
@@ -261,7 +373,8 @@ describe("reduceProfileCommand", () => {
     );
 
     for (const document of [changedThenPatched, patchedThenChanged]) {
-      expect(document.profilesById[initialProfile.id].filters.byId[filter.id]).toMatchObject({
+      expect(profileOf(document).filters[0]).toMatchObject({
+        id: filter.id,
         kind: "initiator",
         value: "",
       });

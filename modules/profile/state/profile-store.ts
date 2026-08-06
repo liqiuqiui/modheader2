@@ -3,17 +3,13 @@ import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 import type { Locale } from "../../../config/locales";
 import i18n from "../../../i18n";
-import type {
-  AddProfileRuleCommand,
-  PatchProfileRuleCommand,
-  ProfileCommand,
-} from "../application/profile-command";
+import type { ProfileCommand } from "../application/profile-command";
 import { reduceProfileCommand } from "../application/reduce-profile-command";
-import { getProfileShortTitle, randomProfileColor } from "../domain/profile-appearance";
-import type { ProfileSnapshot } from "../domain/profile-document";
+import { randomProfileColor } from "../domain/profile-appearance";
 import {
-  PROFILE_DOCUMENT_SCHEMA_VERSION,
+  createProfileDocument,
   type ProfileDocument,
+  type ProfileState,
   withPreferredProfileSelection,
 } from "../domain/profile-document";
 import { createProfile } from "../domain/profile-factory";
@@ -27,24 +23,26 @@ import type {
   ProfileRuleCollectionMap,
   ProfileRulePatch,
 } from "../domain/profile-model";
-import { isProfileDocument } from "../domain/profile-validation";
 import {
   enqueueProfileCommand,
   PROFILE_COMMAND_CLIENT_ID,
 } from "../infrastructure/profile-command-client";
-import { profileStateStorage } from "../infrastructure/profile-storage";
+import {
+  readStoredProfileDocument,
+  watchStoredProfileDocument,
+} from "../infrastructure/profile-storage";
 
 const HISTORY_LIMIT = 50;
 
 export type ProfileStoreStatus = "idle" | "loading" | "ready" | "error";
 
-export interface ProfileStoreState extends ProfileSnapshot {
+export interface ProfileStoreState extends ProfileState {
   status: ProfileStoreStatus;
   revision: number;
   sourceId: string;
   error: string | null;
-  past: ProfileSnapshot[];
-  future: ProfileSnapshot[];
+  past: ProfileState[];
+  future: ProfileState[];
   initialize: (locale: Locale) => Promise<void>;
   selectProfile: (profileId: string) => Promise<boolean>;
   patchProfile: (profileId: string, patch: ProfileMetadataPatch) => Promise<boolean>;
@@ -79,7 +77,7 @@ export interface ProfileStoreState extends ProfileSnapshot {
   convertHeader: (
     profileId: string,
     ruleId: string,
-    target: "headers" | "respHeaders",
+    target: "requestHeaders" | "responseHeaders",
   ) => Promise<boolean>;
   addFilter: (profileId: string, filter: ProfileFilter) => Promise<boolean>;
   patchFilter: (
@@ -116,9 +114,12 @@ let initializationPromise: Promise<void> | null = null;
 let stopWatchingStorage: (() => void) | null = null;
 let pendingCommands = 0;
 let deferredDocument: ProfileDocument | null = null;
+let authoritativeDocument: ProfileDocument | null = null;
 let lastAuthoritativeRevision = 0;
 let sawExternalChange = false;
 let commandFailed = false;
+let storageResetPending = false;
+let storageResetGeneration = 0;
 let currentLocale: Locale = "zh-CN";
 let commandSettlementWaiters: Array<() => void> = [];
 
@@ -135,26 +136,18 @@ function resolveCommandSettlementWaiters() {
 
 function createLocalizedProfile(number: number, locale: Locale): Profile {
   const title = i18n.getFixedT(locale)("profile.defaultName", { number });
-  return createProfile({ title, shortTitle: getProfileShortTitle(String(number)) });
+  return createProfile({ title });
 }
 
-function snapshotOf(state: ProfileSnapshot): ProfileSnapshot {
+function profileStateOf(state: ProfileState): ProfileState {
   return {
-    profilesById: state.profilesById,
-    profileOrder: state.profileOrder,
+    profiles: state.profiles,
     selectedProfileId: state.selectedProfileId,
   };
 }
 
 function documentOf(state: ProfileStoreState): ProfileDocument {
-  return {
-    schemaVersion: PROFILE_DOCUMENT_SCHEMA_VERSION,
-    revision: state.revision,
-    sourceId: state.sourceId,
-    profilesById: state.profilesById,
-    profileOrder: state.profileOrder,
-    selectedProfileId: state.selectedProfileId,
-  };
+  return createProfileDocument(profileStateOf(state), state.sourceId, state.revision);
 }
 
 function errorMessage(error: unknown): string {
@@ -171,8 +164,8 @@ function createAddRuleCommand<K extends ProfileRuleCollection>(
   profileId: string,
   collection: K,
   rule: ProfileRuleCollectionMap[K],
-): AddProfileRuleCommand {
-  return { type: "addRule", profileId, collection, rule } as AddProfileRuleCommand;
+): ProfileCommand {
+  return { type: "addRule", profileId, collection, rule } as ProfileCommand;
 }
 
 function createPatchRuleCommand<K extends ProfileRuleCollection>(
@@ -180,14 +173,14 @@ function createPatchRuleCommand<K extends ProfileRuleCollection>(
   collection: K,
   ruleId: string,
   patch: ProfileRulePatch<K>,
-): PatchProfileRuleCommand {
+): ProfileCommand {
   return {
     type: "patchRule",
     profileId,
     collection,
     ruleId,
     patch,
-  } as PatchProfileRuleCommand;
+  } as ProfileCommand;
 }
 
 export const profileStore = createStore<ProfileStoreState>()((set, get) => {
@@ -195,14 +188,15 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
     document: ProfileDocument,
     options: { clearHistory: boolean; error?: string | null },
   ) => {
+    const profileState = document.state;
+    authoritativeDocument = document;
     lastAuthoritativeRevision = Math.max(lastAuthoritativeRevision, document.revision);
     set((state) => ({
       status: "ready",
       revision: document.revision,
       sourceId: document.sourceId,
-      profilesById: document.profilesById,
-      profileOrder: document.profileOrder,
-      selectedProfileId: document.selectedProfileId,
+      profiles: profileState.profiles,
+      selectedProfileId: profileState.selectedProfileId,
       error: options.error ?? null,
       past: options.clearHistory ? [] : state.past,
       future: options.clearHistory ? [] : state.future,
@@ -210,11 +204,11 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
   };
 
   const synchronizeAfterCommands = async () => {
+    if (storageResetPending) return;
     let document = deferredDocument;
     deferredDocument = null;
     if (!document) {
-      const stored = await profileStateStorage.getValue();
-      if (isProfileDocument(stored)) document = stored;
+      document = await readStoredProfileDocument();
     }
     if (!document) return;
     if (pendingCommands > 0) {
@@ -236,6 +230,7 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
     pendingCommands += 1;
     try {
       const document = await enqueueProfileCommand(command);
+      if (storageResetPending) return true;
       if (document.sourceId !== PROFILE_COMMAND_CLIENT_ID) sawExternalChange = true;
       if (lastAuthoritativeRevision > 0 && document.revision > lastAuthoritativeRevision + 1) {
         sawExternalChange = true;
@@ -251,7 +246,14 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
       pendingCommands -= 1;
       if (pendingCommands === 0) {
         try {
-          await synchronizeAfterCommands();
+          if (!storageResetPending) await synchronizeAfterCommands();
+        } catch (synchronizationError) {
+          const message = errorMessage(synchronizationError);
+          if (authoritativeDocument) {
+            applyDocument(authoritativeDocument, { clearHistory: true, error: message });
+          } else {
+            set({ status: "error", error: message });
+          }
         } finally {
           resolveCommandSettlementWaiters();
         }
@@ -261,7 +263,7 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
 
   const commitCommand = async (
     command: ProfileCommand,
-    options: { recordHistory?: boolean; past?: ProfileSnapshot[]; future?: ProfileSnapshot[] } = {},
+    options: { recordHistory?: boolean; past?: ProfileState[]; future?: ProfileState[] } = {},
   ): Promise<boolean> => {
     const current = get();
     const currentDocument = documentOf(current);
@@ -275,18 +277,18 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
     if (result.status === "noop") return true;
 
     const next = result.document;
+    const nextProfileState = next.state;
     const recordHistory = options.recordHistory ?? true;
     set({
       revision: next.revision,
       sourceId: next.sourceId,
-      profilesById: next.profilesById,
-      profileOrder: next.profileOrder,
-      selectedProfileId: next.selectedProfileId,
+      profiles: nextProfileState.profiles,
+      selectedProfileId: nextProfileState.selectedProfileId,
       error: null,
       past:
         options.past ??
         (recordHistory
-          ? [...current.past, snapshotOf(current)].slice(-HISTORY_LIMIT)
+          ? [...current.past, profileStateOf(current)].slice(-HISTORY_LIMIT)
           : current.past),
       future: options.future ?? (recordHistory ? [] : current.future),
     });
@@ -297,15 +299,32 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
     if (initializationPromise) return initializationPromise;
     set({ status: "loading", error: null });
     const profile = createLocalizedProfile(1, locale);
+    const resetGeneration = storageResetGeneration;
     initializationPromise = enqueueProfileCommand({ type: "initialize", profile })
       .then((document) => {
+        if (resetGeneration !== storageResetGeneration) return;
+        if (storageResetPending) {
+          lastAuthoritativeRevision = document.revision;
+          deferredDocument = null;
+          sawExternalChange = false;
+          commandFailed = false;
+          storageResetPending = false;
+        }
         applyDocument(document, { clearHistory: true });
       })
       .catch((error) => {
+        if (storageResetPending && authoritativeDocument?.state.profiles.length) {
+          storageResetPending = false;
+          applyDocument(authoritativeDocument, { clearHistory: true });
+          return;
+        }
         set({ status: "error", error: errorMessage(error) });
       })
       .finally(() => {
         initializationPromise = null;
+        if (resetGeneration !== storageResetGeneration) {
+          void requestInitialization(currentLocale);
+        }
       });
     return initializationPromise;
   };
@@ -315,8 +334,7 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
     revision: 0,
     sourceId: PROFILE_COMMAND_CLIENT_ID,
     error: null,
-    profilesById: {},
-    profileOrder: [],
+    profiles: [],
     selectedProfileId: null,
     past: [],
     future: [],
@@ -324,10 +342,30 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
     initialize: async (locale) => {
       currentLocale = locale;
       if (!stopWatchingStorage) {
-        stopWatchingStorage = profileStateStorage.watch((document) => {
-          if (!isProfileDocument(document)) return;
-          if (document.profileOrder.length === 0) {
+        stopWatchingStorage = watchStoredProfileDocument((document) => {
+          if (document.state.profiles.length === 0) {
+            storageResetPending = true;
+            storageResetGeneration += 1;
+            lastAuthoritativeRevision = document.revision;
+            authoritativeDocument = document;
+            deferredDocument = null;
+            sawExternalChange = false;
+            commandFailed = false;
             void requestInitialization(currentLocale);
+            return;
+          }
+          if (storageResetPending) {
+            lastAuthoritativeRevision = document.revision;
+            authoritativeDocument = document;
+            deferredDocument = null;
+            sawExternalChange = false;
+            commandFailed = false;
+            if (pendingCommands > 0) {
+              rememberDeferredDocument(document);
+              return;
+            }
+            applyDocument(document, { clearHistory: true });
+            if (!initializationPromise) storageResetPending = false;
             return;
           }
           if (document.revision < lastAuthoritativeRevision) return;
@@ -339,6 +377,7 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
           applyDocument(document, {
             clearHistory: document.sourceId !== PROFILE_COMMAND_CLIENT_ID,
           });
+          if (storageResetPending && !initializationPromise) storageResetPending = false;
         });
       }
       if (get().status === "ready") return;
@@ -452,23 +491,21 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
     },
 
     reorderProfiles: async (fromIndex, toIndex) => {
-      const profileOrder = get().profileOrder;
-      const sourceProfileId = profileOrder[fromIndex];
-      const targetProfileId = profileOrder[toIndex];
+      const profiles = get().profiles;
+      const sourceProfileId = profiles[fromIndex]?.id;
+      const targetProfileId = profiles[toIndex]?.id;
       if (!sourceProfileId || !targetProfileId) return true;
       return commitCommand({ type: "reorderProfiles", sourceProfileId, targetProfileId });
     },
 
     addProfile: async (locale) => {
-      const profile = createLocalizedProfile(get().profileOrder.length + 1, locale);
+      const profile = createLocalizedProfile(get().profiles.length + 1, locale);
       return commitCommand({ type: "addProfile", profile });
     },
 
     cloneProfile: async (profileId, locale) => {
       const state = get();
-      const original = Object.hasOwn(state.profilesById, profileId)
-        ? state.profilesById[profileId]
-        : undefined;
+      const original = state.profiles.find((profile) => profile.id === profileId);
       if (!original) return true;
       const title = i18n.getFixedT(locale)("profile.copyName", { title: original.title });
       return commitCommand({
@@ -508,14 +545,14 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
       if (!target) return true;
       return commitCommand(
         {
-          type: "replaceSnapshot",
-          snapshot: withPreferredProfileSelection(target, state.selectedProfileId),
+          type: "replaceState",
+          state: withPreferredProfileSelection(target, state.selectedProfileId),
           expectedRevision: state.revision,
         },
         {
           recordHistory: false,
           past: state.past.slice(0, -1),
-          future: [snapshotOf(state), ...state.future].slice(0, HISTORY_LIMIT),
+          future: [profileStateOf(state), ...state.future].slice(0, HISTORY_LIMIT),
         },
       );
     },
@@ -527,13 +564,13 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
       if (!target) return true;
       return commitCommand(
         {
-          type: "replaceSnapshot",
-          snapshot: withPreferredProfileSelection(target, state.selectedProfileId),
+          type: "replaceState",
+          state: withPreferredProfileSelection(target, state.selectedProfileId),
           expectedRevision: state.revision,
         },
         {
           recordHistory: false,
-          past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+          past: [...state.past, profileStateOf(state)].slice(-HISTORY_LIMIT),
           future: state.future.slice(1),
         },
       );

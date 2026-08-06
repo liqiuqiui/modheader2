@@ -4,15 +4,15 @@ import { isProfileDocument } from "../domain/profile-validation";
 
 export type { ProfileDocument } from "../domain/profile-document";
 
-export const PROFILE_STATE_STORAGE_KEY = "local:profile-state-v2" as const;
+export const PROFILE_STATE_STORAGE_KEY = "local:profile-state" as const;
 
-export const profileStateStorage = storage.defineItem<ProfileDocument>(PROFILE_STATE_STORAGE_KEY, {
+const profileStateStorage = storage.defineItem<ProfileDocument>(PROFILE_STATE_STORAGE_KEY, {
   defaultValue: createEmptyProfileDocument(),
 });
 
 export async function readStoredProfileDocument(): Promise<ProfileDocument> {
-  const value = await profileStateStorage.getValue();
-  return isProfileDocument(value) ? value : createEmptyProfileDocument();
+  const document = await profileStateStorage.getValue();
+  return isProfileDocument(document) ? document : createEmptyProfileDocument();
 }
 
 export async function writeStoredProfileDocument(document: ProfileDocument): Promise<void> {
@@ -20,4 +20,12 @@ export async function writeStoredProfileDocument(document: ProfileDocument): Pro
     throw new Error("Refusing to persist an invalid profile document");
   }
   await profileStateStorage.setValue(document);
+}
+
+export function watchStoredProfileDocument(
+  callback: (document: ProfileDocument) => void,
+): () => void {
+  return profileStateStorage.watch((value) => {
+    callback(isProfileDocument(value) ? value : createEmptyProfileDocument());
+  });
 }

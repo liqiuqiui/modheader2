@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createCspRule, createHeaderRule } from "../../domain/profile-factory";
-import { isProfileCommandMessage, PROFILE_COMMAND_CHANNEL } from "../profile-command-protocol";
+import { createInitialProfileDocument } from "../../domain/profile-document";
+import { createCspRule, createHeaderRule, createProfile } from "../../domain/profile-factory";
+import {
+  isProfileCommandMessage,
+  parseProfileCommandResponse,
+  PROFILE_COMMAND_CHANNEL,
+} from "../profile-command-protocol";
 
 function commandMessage(command: unknown): unknown {
   return {
@@ -11,15 +16,34 @@ function commandMessage(command: unknown): unknown {
 }
 
 describe("profile command protocol", () => {
+  it("uses the new command channel", () => {
+    expect(PROFILE_COMMAND_CHANNEL).toBe("profile-store-command");
+    expect(
+      isProfileCommandMessage({
+        ...(commandMessage({ type: "selectProfile", profileId: "profile-1" }) as object),
+        extra: true,
+      }),
+    ).toBe(false);
+    expect(
+      isProfileCommandMessage(
+        commandMessage({ type: "selectProfile", profileId: "profile-1", extra: true }),
+      ),
+    ).toBe(false);
+  });
+
   it.each([
     {
       type: "clearRules",
       profileId: "profile-1",
-      collection: "headers",
+      collection: "requestHeaders",
     },
     {
       type: "clearFilters",
       profileId: "profile-1",
+    },
+    {
+      type: "replaceState",
+      state: { profiles: [], selectedProfileId: null },
     },
   ])("rejects $type without expectedRevision", (command) => {
     expect(isProfileCommandMessage(commandMessage(command))).toBe(false);
@@ -31,7 +55,7 @@ describe("profile command protocol", () => {
         commandMessage({
           type: "addRule",
           profileId: "profile-1",
-          collection: "headers",
+          collection: "requestHeaders",
           rule: {
             id: "header-1",
             enabled: true,
@@ -64,30 +88,34 @@ describe("profile command protocol", () => {
     ).toBe(false);
   });
 
-  it("accepts CSP as a virtual response rule collection", () => {
+  it("accepts dedicated CSP rules and response headers that can be converted to CSP", () => {
     expect(
       isProfileCommandMessage(
         commandMessage({
           type: "addRule",
           profileId: "profile-1",
           collection: "csp",
-          rule: createCspRule({ id: "csp-1", value: "default-src 'self'" }),
+          rule: createCspRule({ id: "csp-1", directive: "default-src", value: "'self'" }),
         }),
       ),
     ).toBe(true);
     expect(
       isProfileCommandMessage(
         commandMessage({
-          type: "clearRules",
+          type: "addRule",
           profileId: "profile-1",
-          collection: "csp",
-          expectedRevision: 3,
+          collection: "responseHeaders",
+          rule: createHeaderRule({
+            id: "response-csp",
+            name: "Content-Security-Policy",
+            value: "default-src 'self'",
+          }),
         }),
       ),
     ).toBe(true);
   });
 
-  it("rejects CSP payloads and patches that can escape the virtual collection", () => {
+  it("keeps CSP and header patch shapes separate", () => {
     expect(
       isProfileCommandMessage(
         commandMessage({
@@ -95,19 +123,9 @@ describe("profile command protocol", () => {
           profileId: "profile-1",
           collection: "csp",
           rule: createHeaderRule({
-            id: "legacy-csp",
+            id: "header-shaped-csp",
             name: "Content-Security-Policy",
           }),
-        }),
-      ),
-    ).toBe(false);
-    expect(
-      isProfileCommandMessage(
-        commandMessage({
-          type: "addRule",
-          profileId: "profile-1",
-          collection: "csp",
-          rule: { ...createCspRule({ id: "csp-1" }), name: "x-not-csp" },
         }),
       ),
     ).toBe(false);
@@ -122,5 +140,28 @@ describe("profile command protocol", () => {
         }),
       ),
     ).toBe(false);
+  });
+
+  it("requires a replacement profile for deletion commands", () => {
+    expect(
+      isProfileCommandMessage(commandMessage({ type: "deleteProfile", profileId: "profile-1" })),
+    ).toBe(false);
+  });
+
+  it("accepts schema 1 responses and rejects old schemas", () => {
+    const document = createInitialProfileDocument(
+      createProfile({ id: "profile-1", title: "Current" }),
+      "background",
+      3,
+    );
+
+    expect(parseProfileCommandResponse({ ok: true, document })).toEqual({ ok: true, document });
+    expect(parseProfileCommandResponse({ ok: true, document, extra: true })).toBeNull();
+    expect(
+      parseProfileCommandResponse({
+        ok: true,
+        document: { ...document, schemaVersion: 2 },
+      }),
+    ).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import type { ProfileSnapshot } from "../domain/profile-document";
+import type { ProfileState } from "../domain/profile-document";
 import type {
   FilterKind,
   Profile,
@@ -10,24 +10,20 @@ import type {
   ProfileRulePatch,
 } from "../domain/profile-model";
 
-export type AddProfileRuleCommand = {
-  [K in ProfileRuleCollection]: {
-    type: "addRule";
-    profileId: string;
-    collection: K;
-    rule: ProfileRuleCollectionMap[K];
-  };
-}[ProfileRuleCollection];
+export type AddProfileRuleCommand<K extends ProfileRuleCollection = ProfileRuleCollection> = {
+  type: "addRule";
+  profileId: string;
+  collection: K;
+  rule: ProfileRuleCollectionMap[K];
+};
 
-export type PatchProfileRuleCommand = {
-  [K in ProfileRuleCollection]: {
-    type: "patchRule";
-    profileId: string;
-    collection: K;
-    ruleId: string;
-    patch: ProfileRulePatch<K>;
-  };
-}[ProfileRuleCollection];
+export type PatchProfileRuleCommand<K extends ProfileRuleCollection = ProfileRuleCollection> = {
+  type: "patchRule";
+  profileId: string;
+  collection: K;
+  ruleId: string;
+  patch: ProfileRulePatch<K>;
+};
 
 export type ProfileCommand =
   | { type: "initialize"; profile: Profile }
@@ -48,8 +44,12 @@ export type ProfileCommand =
     }
   | { type: "deleteProfile"; profileId: string; replacement: Profile }
   | { type: "importProfiles"; profiles: Profile[] }
-  | AddProfileRuleCommand
-  | PatchProfileRuleCommand
+  | {
+      [K in ProfileRuleCollection]: AddProfileRuleCommand<K>;
+    }[ProfileRuleCollection]
+  | {
+      [K in ProfileRuleCollection]: PatchProfileRuleCommand<K>;
+    }[ProfileRuleCollection]
   | {
       type: "deleteRule";
       profileId: string;
@@ -79,7 +79,7 @@ export type ProfileCommand =
       type: "convertHeader";
       profileId: string;
       ruleId: string;
-      target: "headers" | "respHeaders";
+      target: "requestHeaders" | "responseHeaders";
     }
   | { type: "addFilter"; profileId: string; filter: ProfileFilter }
   | {
@@ -106,13 +106,13 @@ export type ProfileCommand =
   | { type: "setFiltersEnabled"; profileId: string; enabled: boolean }
   | { type: "clearFilters"; profileId: string; expectedRevision: number }
   | { type: "sortProfileRules"; profileId: string }
-  | { type: "replaceSnapshot"; snapshot: ProfileSnapshot; expectedRevision: number };
+  | { type: "replaceState"; state: ProfileState; expectedRevision: number };
 
 export function expectedProfileCommandRevision(command: ProfileCommand): number | undefined {
   if (
     command.type === "clearRules" ||
     command.type === "clearFilters" ||
-    command.type === "replaceSnapshot"
+    command.type === "replaceState"
   ) {
     return command.expectedRevision;
   }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { clsx } from "clsx";
 import {
@@ -33,12 +33,14 @@ import {
 import { Switch } from "./ui/switch";
 import { useTranslation } from "react-i18next";
 
+const EMPTY_NAME_SUGGESTIONS: readonly string[] = [];
+
 interface HeaderRuleRowProps {
   rule: HeaderRule;
-  onChange: (patch: Partial<HeaderRule>) => void;
-  onDelete: () => void;
-  onClone?: () => void;
-  onConvert?: () => void;
+  onChange: (ruleId: string, patch: Partial<HeaderRule>) => void;
+  onDelete: (ruleId: string) => void;
+  onClone?: (ruleId: string) => void;
+  onConvert?: (ruleId: string) => void;
   convertLabel?: string;
   autoFocus?: boolean;
   searchQuery?: string;
@@ -50,7 +52,7 @@ function isSensitiveHeader(name: string) {
   return /authorization|cookie|set-cookie|token|secret|password|api[-_]?key/i.test(name);
 }
 
-export function HeaderRuleRow({
+function HeaderRuleRowComponent({
   rule,
   onChange,
   onDelete,
@@ -59,7 +61,7 @@ export function HeaderRuleRow({
   convertLabel,
   autoFocus,
   compact = false,
-  nameSuggestions = [],
+  nameSuggestions = EMPTY_NAME_SUGGESTIONS,
 }: HeaderRuleRowProps) {
   const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
@@ -100,7 +102,7 @@ export function HeaderRuleRow({
         )}
         <Switch
           checked={rule.enabled}
-          onCheckedChange={(enabled) => onChange({ enabled })}
+          onCheckedChange={(enabled) => onChange(rule.id, { enabled })}
           aria-label={`${rule.name || "Header"} ${rule.enabled ? t("common.enabled") : t("common.disabled")}`}
           className="shrink-0"
         />
@@ -111,10 +113,10 @@ export function HeaderRuleRow({
           autoComplete="off"
           autoHighlight
           onInputValueChange={(name, eventDetails) => {
-            if (eventDetails.reason === "input-change") onChange({ name });
+            if (eventDetails.reason === "input-change") onChange(rule.id, { name });
           }}
           onValueChange={(name) => {
-            if (name !== null) onChange({ name });
+            if (name !== null) onChange(rule.id, { name });
           }}
         >
           <ComboboxInput
@@ -147,7 +149,7 @@ export function HeaderRuleRow({
             placeholder={t("header.valuePlaceholder")}
             value={rule.value}
             autoFocus={autoFocus && Boolean(rule.name)}
-            onChange={(event) => onChange({ value: event.target.value })}
+            onChange={(event) => onChange(rule.id, { value: event.target.value })}
             spellCheck={false}
           />
           {sensitive && (
@@ -168,7 +170,9 @@ export function HeaderRuleRow({
         {!compact && (
           <Select
             value={rule.appendMode}
-            onValueChange={(appendMode) => onChange({ appendMode: appendMode as AppendMode })}
+            onValueChange={(appendMode) =>
+              onChange(rule.id, { appendMode: appendMode as AppendMode })
+            }
           >
             <SelectTrigger
               aria-label={t("header.mode")}
@@ -191,7 +195,7 @@ export function HeaderRuleRow({
           type="button"
           aria-label={t("header.delete")}
           className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-          onClick={onDelete}
+          onClick={() => onDelete(rule.id)}
         >
           <Trash2 aria-hidden="true" className="h-4 w-4" />
         </button>
@@ -217,7 +221,7 @@ export function HeaderRuleRow({
                 onSelect={() => {
                   if (showComment) {
                     setShowComment(false);
-                    onChange({ comment: "" });
+                    onChange(rule.id, { comment: "" });
                     return;
                   }
                   setShowComment(true);
@@ -234,7 +238,7 @@ export function HeaderRuleRow({
               {onClone && (
                 <DropdownMenu.Item
                   className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs outline-none transition hover:bg-slate-100 focus:bg-slate-100"
-                  onSelect={onClone}
+                  onSelect={() => onClone?.(rule.id)}
                 >
                   <Copy aria-hidden="true" className="h-3.5 w-3.5" /> {t("header.clone")}
                 </DropdownMenu.Item>
@@ -242,7 +246,7 @@ export function HeaderRuleRow({
               {onConvert && convertLabel && (
                 <DropdownMenu.Item
                   className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs outline-none transition hover:bg-slate-100 focus:bg-slate-100"
-                  onSelect={onConvert}
+                  onSelect={() => onConvert?.(rule.id)}
                 >
                   <ArrowRightLeft aria-hidden="true" className="h-3.5 w-3.5" /> {convertLabel}
                 </DropdownMenu.Item>
@@ -259,10 +263,12 @@ export function HeaderRuleRow({
             className="h-8 border-dashed border-slate-200 bg-transparent text-xs font-normal text-slate-500 shadow-none"
             placeholder={t("header.commentPlaceholder")}
             value={rule.comment}
-            onChange={(event) => onChange({ comment: event.target.value })}
+            onChange={(event) => onChange(rule.id, { comment: event.target.value })}
           />
         </div>
       )}
     </div>
   );
 }
+
+export const HeaderRuleRow = memo(HeaderRuleRowComponent);

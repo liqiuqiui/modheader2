@@ -1,6 +1,6 @@
-import { isArray, isEmpty } from "lodash-es";
-import { moveItemById } from "../domain/profile-collections";
+import { arrayMoveImmutable } from "array-move";
 import { isNonEmptyString, isNonNegativeInteger } from "../domain/profile-guards";
+import { isProfileBackgroundColor } from "../domain/profile-appearance";
 import {
   addProfileFilter,
   changeProfileFilterKind,
@@ -13,9 +13,9 @@ import {
 } from "../domain/profile-filter-operations";
 import {
   createInitialProfileDocument,
-  PROFILE_DOCUMENT_SCHEMA_VERSION,
+  createProfileDocument,
   type ProfileDocument,
-  type ProfileSnapshot,
+  type ProfileState,
 } from "../domain/profile-document";
 import type { Profile } from "../domain/profile-model";
 import { applyProfileMetadataPatch } from "../domain/profile-operations";
@@ -29,7 +29,7 @@ import {
   setProfileRulesEnabled,
   sortProfileRuleCollections,
 } from "../domain/profile-rule-operations";
-import { isProfile, isProfileSnapshot } from "../domain/profile-validation";
+import { isProfile, isProfileState } from "../domain/profile-validation";
 import { expectedProfileCommandRevision, type ProfileCommand } from "./profile-command";
 
 export type ProfileCommandResult =
@@ -50,17 +50,10 @@ export function isProfileCommandRevisionConflict(
 
 function nextDocument(
   current: ProfileDocument,
-  snapshot: ProfileSnapshot,
+  state: ProfileState,
   sourceId: string,
 ): ProfileDocument {
-  return {
-    schemaVersion: PROFILE_DOCUMENT_SCHEMA_VERSION,
-    revision: current.revision + 1,
-    sourceId,
-    profilesById: snapshot.profilesById,
-    profileOrder: snapshot.profileOrder,
-    selectedProfileId: snapshot.selectedProfileId,
-  };
+  return createProfileDocument(state, sourceId, current.revision + 1);
 }
 
 function replaceProfile(
@@ -69,19 +62,14 @@ function replaceProfile(
   sourceId: string,
   update: (profile: Profile) => Profile,
 ): ProfileDocument {
-  if (!Object.hasOwn(current.profilesById, profileId)) return current;
-  const profile = current.profilesById[profileId];
+  const index = current.state.profiles.findIndex((profile) => profile.id === profileId);
+  if (index < 0) return current;
+  const profile = current.state.profiles[index];
   const nextProfile = update(profile);
   if (nextProfile === profile || !isProfile(nextProfile)) return current;
-  return nextDocument(
-    current,
-    {
-      profilesById: { ...current.profilesById, [profileId]: nextProfile },
-      profileOrder: current.profileOrder,
-      selectedProfileId: current.selectedProfileId,
-    },
-    sourceId,
-  );
+  const profiles = [...current.state.profiles];
+  profiles[index] = nextProfile;
+  return nextDocument(current, { ...current.state, profiles }, sourceId);
 }
 
 function sortProfile(profile: Profile): Profile {
@@ -93,27 +81,21 @@ function reduceProfileCommandDocument(
   command: ProfileCommand,
   sourceId: string,
 ): ProfileDocument {
+  const state = current.state;
+
   if (command.type === "initialize") {
-    if (current.profileOrder.length > 0 || !isProfile(command.profile)) return current;
+    if (state.profiles.length > 0 || !isProfile(command.profile)) return current;
     return createInitialProfileDocument(command.profile, sourceId, current.revision + 1);
   }
 
   if (command.type === "selectProfile") {
     if (
-      command.profileId === current.selectedProfileId ||
-      !Object.hasOwn(current.profilesById, command.profileId)
+      command.profileId === state.selectedProfileId ||
+      !state.profiles.some((profile) => profile.id === command.profileId)
     ) {
       return current;
     }
-    return nextDocument(
-      current,
-      {
-        profilesById: current.profilesById,
-        profileOrder: current.profileOrder,
-        selectedProfileId: command.profileId,
-      },
-      sourceId,
-    );
+    return nextDocument(current, { ...state, selectedProfileId: command.profileId }, sourceId);
   }
 
   if (command.type === "patchProfile") {
@@ -123,32 +105,31 @@ function reduceProfileCommandDocument(
   }
 
   if (command.type === "reorderProfiles") {
-    const profileOrder = moveItemById(
-      current.profileOrder,
-      command.sourceProfileId,
-      command.targetProfileId,
+    const sourceIndex = state.profiles.findIndex(
+      (profile) => profile.id === command.sourceProfileId,
     );
-    if (profileOrder === current.profileOrder) return current;
+    const targetIndex = state.profiles.findIndex(
+      (profile) => profile.id === command.targetProfileId,
+    );
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return current;
     return nextDocument(
       current,
-      {
-        profilesById: current.profilesById,
-        profileOrder,
-        selectedProfileId: current.selectedProfileId,
-      },
+      { ...state, profiles: arrayMoveImmutable(state.profiles, sourceIndex, targetIndex) },
       sourceId,
     );
   }
 
   if (command.type === "addProfile") {
-    if (!isProfile(command.profile) || Object.hasOwn(current.profilesById, command.profile.id)) {
+    if (
+      !isProfile(command.profile) ||
+      state.profiles.some((profile) => profile.id === command.profile.id)
+    ) {
       return current;
     }
     return nextDocument(
       current,
       {
-        profilesById: { ...current.profilesById, [command.profile.id]: command.profile },
-        profileOrder: [...current.profileOrder, command.profile.id],
+        profiles: [...state.profiles, command.profile],
         selectedProfileId: command.profile.id,
       },
       sourceId,
@@ -156,72 +137,61 @@ function reduceProfileCommandDocument(
   }
 
   if (command.type === "cloneProfile") {
+    const original = state.profiles.find((profile) => profile.id === command.sourceProfileId);
     if (
-      !Object.hasOwn(current.profilesById, command.sourceProfileId) ||
+      !original ||
       !isNonEmptyString(command.cloneId) ||
-      Object.hasOwn(current.profilesById, command.cloneId) ||
+      state.profiles.some((profile) => profile.id === command.cloneId) ||
       typeof command.title !== "string" ||
-      !isNonEmptyString(command.backgroundColor)
+      !isProfileBackgroundColor(command.backgroundColor)
     ) {
       return current;
     }
-    const source = current.profilesById[command.sourceProfileId];
     const clone = applyProfileMetadataPatch(
-      { ...structuredClone(source), id: command.cloneId },
+      { ...structuredClone(original), id: command.cloneId },
       { title: command.title, backgroundColor: command.backgroundColor },
     );
     if (!isProfile(clone)) return current;
     return nextDocument(
       current,
-      {
-        profilesById: { ...current.profilesById, [clone.id]: clone },
-        profileOrder: [...current.profileOrder, clone.id],
-        selectedProfileId: clone.id,
-      },
+      { profiles: [...state.profiles, clone], selectedProfileId: clone.id },
       sourceId,
     );
   }
 
   if (command.type === "deleteProfile") {
-    if (!Object.hasOwn(current.profilesById, command.profileId)) return current;
-    if (current.profileOrder.length === 1) {
+    const deletedIndex = state.profiles.findIndex((profile) => profile.id === command.profileId);
+    if (deletedIndex < 0) return current;
+    if (state.profiles.length === 1) {
       if (!isProfile(command.replacement)) return current;
       return nextDocument(
         current,
-        {
-          profilesById: { [command.replacement.id]: command.replacement },
-          profileOrder: [command.replacement.id],
-          selectedProfileId: command.replacement.id,
-        },
+        { profiles: [command.replacement], selectedProfileId: command.replacement.id },
         sourceId,
       );
     }
 
-    const deletedIndex = current.profileOrder.indexOf(command.profileId);
-    const profileOrder = current.profileOrder.filter((id) => id !== command.profileId);
-    const profilesById = { ...current.profilesById };
-    delete profilesById[command.profileId];
+    const profiles = state.profiles.filter((profile) => profile.id !== command.profileId);
     const selectedProfileId =
-      current.selectedProfileId === command.profileId
-        ? profileOrder[Math.min(deletedIndex, profileOrder.length - 1)]
-        : current.selectedProfileId;
-    return nextDocument(current, { profilesById, profileOrder, selectedProfileId }, sourceId);
+      state.selectedProfileId === command.profileId
+        ? profiles[Math.min(deletedIndex, profiles.length - 1)].id
+        : state.selectedProfileId;
+    return nextDocument(current, { profiles, selectedProfileId }, sourceId);
   }
 
   if (command.type === "importProfiles") {
-    if (!isArray(command.profiles) || isEmpty(command.profiles)) return current;
-    const profilesById = { ...current.profilesById };
+    if (!Array.isArray(command.profiles) || command.profiles.length === 0) return current;
+    const ids = new Set(state.profiles.map((profile) => profile.id));
     const importedProfiles = command.profiles.filter((profile) => {
-      if (!isProfile(profile) || Object.hasOwn(profilesById, profile.id)) return false;
-      profilesById[profile.id] = profile;
+      if (!isProfile(profile) || ids.has(profile.id)) return false;
+      ids.add(profile.id);
       return true;
     });
     if (importedProfiles.length === 0) return current;
     return nextDocument(
       current,
       {
-        profilesById,
-        profileOrder: [...current.profileOrder, ...importedProfiles.map((profile) => profile.id)],
+        profiles: [...state.profiles, ...importedProfiles],
         selectedProfileId: importedProfiles[0].id,
       },
       sourceId,
@@ -314,11 +284,9 @@ function reduceProfileCommandDocument(
     return replaceProfile(current, command.profileId, sourceId, sortProfile);
   }
 
-  if (command.type === "replaceSnapshot") {
-    if (!isProfileSnapshot(command.snapshot) || command.snapshot.profileOrder.length === 0) {
-      return current;
-    }
-    return nextDocument(current, command.snapshot, sourceId);
+  if (command.type === "replaceState") {
+    if (!isProfileState(command.state) || command.state.profiles.length === 0) return current;
+    return nextDocument(current, command.state, sourceId);
   }
 
   return current;
@@ -332,7 +300,7 @@ export function reduceProfileCommand(
   const requiresExpectedRevision =
     command.type === "clearRules" ||
     command.type === "clearFilters" ||
-    command.type === "replaceSnapshot";
+    command.type === "replaceState";
   const expectedRevision = expectedProfileCommandRevision(command);
   if (requiresExpectedRevision && !isNonNegativeInteger(expectedRevision)) {
     return { status: "noop", document: current };

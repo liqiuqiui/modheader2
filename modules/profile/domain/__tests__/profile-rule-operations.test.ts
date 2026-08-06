@@ -1,121 +1,167 @@
 import { describe, expect, it } from "vitest";
-import { isContentSecurityPolicyRule } from "../profile-csp";
 import { createCspRule, createHeaderRule, createProfile } from "../profile-factory";
+import type { Profile } from "../profile-model";
 import {
   addProfileRule,
   clearProfileRules,
+  cloneProfileRule,
   convertProfileHeader,
+  deleteProfileRule,
   patchProfileRule,
   setProfileRulesEnabled,
+  sortProfileRuleCollections,
 } from "../profile-rule-operations";
 
-function profileWithResponseRules() {
+function profileWithRules(): Profile {
+  const profile = createProfile({ title: "Test", id: "profile-1", backgroundColor: "#2563eb" });
   return {
-    ...createProfile({ title: "Test", id: "profile-1", backgroundColor: "#2563eb" }),
-    headers: [],
-    respHeaders: [
-      createHeaderRule({ id: "response-1", name: "x-test", value: "1" }),
-      createCspRule({ id: "csp-1", value: "default-src 'self'" }),
-    ],
+    ...profile,
+    rules: {
+      ...profile.rules,
+      requestHeaders: [],
+      responseHeaders: [createHeaderRule({ id: "response-1", name: "x-test", value: "1" })],
+      csp: [createCspRule({ id: "csp-1", directive: "default-src", value: "'self'" })],
+    },
   };
 }
 
-describe("profile response rule collections", () => {
-  it("clears ordinary response headers and CSP directives independently", () => {
-    const profile = profileWithResponseRules();
+describe("profile rule collections", () => {
+  it("keeps response headers and CSP directives in independent collections", () => {
+    const profile = profileWithRules();
 
-    expect(clearProfileRules(profile, "respHeaders").respHeaders).toEqual([
-      expect.objectContaining({ id: "csp-1" }),
-    ]);
-    expect(clearProfileRules(profile, "csp").respHeaders).toEqual([
-      expect.objectContaining({ id: "response-1" }),
-    ]);
+    expect(clearProfileRules(profile, "responseHeaders").rules).toMatchObject({
+      responseHeaders: [],
+      csp: [expect.objectContaining({ id: "csp-1" })],
+    });
+    expect(clearProfileRules(profile, "csp").rules).toMatchObject({
+      responseHeaders: [expect.objectContaining({ id: "response-1" })],
+      csp: [],
+    });
   });
 
-  it("toggles only the selected virtual response collection", () => {
-    const profile = profileWithResponseRules();
+  it("toggles only the selected collection", () => {
+    const profile = profileWithRules();
     const patched = setProfileRulesEnabled(profile, "csp", false);
 
-    expect(patched.respHeaders.find((rule) => rule.id === "response-1")?.enabled).toBe(true);
-    expect(patched.respHeaders.find((rule) => rule.id === "csp-1")?.enabled).toBe(false);
+    expect(patched.rules.responseHeaders[0].enabled).toBe(true);
+    expect(patched.rules.csp[0].enabled).toBe(false);
   });
 
-  it("keeps legacy CSP identity stable across value edits and stale conversions", () => {
-    const profile = profileWithResponseRules();
-    profile.respHeaders[1] = createHeaderRule({
+  it("moves a CSP response header into the dedicated collection when added", () => {
+    const profile = profileWithRules();
+    const added = addProfileRule(
+      profile,
+      "responseHeaders",
+      createHeaderRule({
+        id: "csp-2",
+        enabled: false,
+        name: " content-security-policy ",
+        value: "script-src 'none'",
+        comment: "keep",
+      }),
+    );
+
+    expect(added.rules.responseHeaders.map((rule) => rule.id)).toEqual(["response-1"]);
+    expect(added.rules.csp.at(-1)).toEqual({
+      id: "csp-2",
+      enabled: false,
+      directive: "script-src",
+      value: "'none'",
+      comment: "keep",
+    });
+  });
+
+  it("moves an existing response header into CSP when its name is patched", () => {
+    const profile = profileWithRules();
+    const patched = patchProfileRule(profile, "responseHeaders", "response-1", {
+      name: "Content-Security-Policy",
+      value: "img-src data:",
+    });
+
+    expect(patched.rules.responseHeaders).toEqual([]);
+    expect(patched.rules.csp.map((rule) => rule.id)).toEqual(["csp-1", "response-1"]);
+    expect(patched.rules.csp[1]).toMatchObject({ directive: "img-src", value: "data:" });
+  });
+
+  it("interprets a stale response value patch after the rule moved into CSP", () => {
+    const profile = patchProfileRule(profileWithRules(), "responseHeaders", "response-1", {
+      name: "Content-Security-Policy",
+      value: "default-src 'self'",
+    });
+    const patched = patchProfileRule(profile, "responseHeaders", "response-1", {
+      value: "script-src 'none'",
+      comment: "updated",
+    });
+
+    expect(patched.rules.csp.find((rule) => rule.id === "response-1")).toMatchObject({
+      directive: "script-src",
+      value: "'none'",
+      comment: "updated",
+    });
+  });
+
+  it("patches dedicated CSP fields without accepting header-only fields", () => {
+    const profile = profileWithRules();
+    const patched = patchProfileRule(profile, "csp", "csp-1", {
+      directive: "script-src",
+      value: "'none'",
+      name: "x-ignored",
+      appendMode: "append",
+    });
+
+    expect(patched.rules.csp[0]).toEqual({
+      id: "csp-1",
+      enabled: true,
+      directive: "script-src",
+      value: "'none'",
+      comment: "",
+    });
+  });
+
+  it("converts ordinary and CSP headers between request and response sides", () => {
+    const responseToRequest = convertProfileHeader(
+      profileWithRules(),
+      "response-1",
+      "requestHeaders",
+    );
+    expect(responseToRequest.rules.responseHeaders).toEqual([]);
+    expect(responseToRequest.rules.requestHeaders.at(-1)?.id).toBe("response-1");
+
+    const cspToRequest = convertProfileHeader(profileWithRules(), "csp-1", "requestHeaders");
+    expect(cspToRequest.rules.csp).toEqual([]);
+    expect(cspToRequest.rules.requestHeaders.at(-1)).toMatchObject({
       id: "csp-1",
       name: "Content-Security-Policy",
       value: "default-src 'self'",
     });
 
-    const toggled = setProfileRulesEnabled(profile, "csp", false);
-    expect(toggled.respHeaders[1].cspMode).toBeUndefined();
-
-    const patched = patchProfileRule(toggled, "csp", "csp-1", {
-      value: "script-src\t'none'",
+    const backToResponse = convertProfileHeader(cspToRequest, "csp-1", "responseHeaders");
+    expect(backToResponse.rules.responseHeaders).toEqual(profileWithRules().rules.responseHeaders);
+    expect(backToResponse.rules.csp.at(-1)).toMatchObject({
+      id: "csp-1",
+      directive: "default-src",
+      value: "'self'",
     });
-    expect(patched.respHeaders[1].cspMode).toBeUndefined();
-
-    const patchThenConvert = convertProfileHeader(patched, "csp-1", "headers");
-    const convertThenPatch = patchProfileRule(
-      convertProfileHeader(toggled, "csp-1", "headers"),
-      "csp",
-      "csp-1",
-      { value: "script-src\t'none'" },
-    );
-    expect(patchThenConvert.headers.at(-1)).toEqual(convertThenPatch.headers.at(-1));
-    expect(patchThenConvert.headers.at(-1)?.cspMode).toBeUndefined();
   });
 
-  it("preserves the raw response rule order while patching a virtual collection", () => {
-    const profile = profileWithResponseRules();
-    profile.respHeaders.reverse();
-    const patched = patchProfileRule(profile, "csp", "csp-1", {
-      value: "script-src 'none'",
-    });
+  it("clones and deletes rules while enforcing profile-wide ID uniqueness", () => {
+    const profile = profileWithRules();
+    const cloned = cloneProfileRule(profile, "csp", "csp-1", "csp-copy");
 
-    expect(patched.respHeaders.map((rule) => rule.id)).toEqual(["csp-1", "response-1"]);
+    expect(cloned.rules.csp.map((rule) => rule.id)).toEqual(["csp-1", "csp-copy"]);
+    expect(cloneProfileRule(cloned, "csp", "csp-1", "response-1")).toBe(cloned);
+    expect(deleteProfileRule(cloned, "csp", "csp-copy").rules.csp).toHaveLength(1);
   });
 
-  it("forces rules added through the CSP collection into directive mode", () => {
-    const profile = profileWithResponseRules();
-    const added = addProfileRule(
-      profile,
-      "csp",
-      createHeaderRule({ id: "csp-2", name: "x-wrong", value: "script-src 'none'" }),
-    );
+  it("sorts request and response headers without rebuilding an already sorted profile", () => {
+    const profile = profileWithRules();
+    profile.rules.requestHeaders = [
+      createHeaderRule({ id: "b", name: "x-b" }),
+      createHeaderRule({ id: "a", name: "x-a" }),
+    ];
+    const sorted = sortProfileRuleCollections(profile);
 
-    const rule = added.respHeaders.find((item) => item.id === "csp-2");
-    expect(rule && isContentSecurityPolicyRule(rule)).toBe(true);
-    expect(rule?.cspMode).toBe("directive");
-  });
-
-  it("moves an ordinary response rule into the CSP collection when its name changes", () => {
-    const profile = profileWithResponseRules();
-    const patched = patchProfileRule(profile, "respHeaders", "response-1", {
-      name: "content-security-policy",
-      value: "img-src data:",
-    });
-
-    expect(patched.respHeaders.filter(isContentSecurityPolicyRule).map((rule) => rule.id)).toEqual([
-      "response-1",
-      "csp-1",
-    ]);
-  });
-
-  it("does not allow a CSP patch to change its fixed header identity", () => {
-    const profile = profileWithResponseRules();
-    const patched = patchProfileRule(profile, "csp", "csp-1", {
-      name: "x-not-csp",
-      appendMode: "append",
-    });
-
-    expect(patched).toBe(profile);
-  });
-
-  it("treats CSP as already converted to the response side", () => {
-    const profile = profileWithResponseRules();
-
-    expect(convertProfileHeader(profile, "csp-1", "respHeaders")).toBe(profile);
+    expect(sorted.rules.requestHeaders.map((rule) => rule.id)).toEqual(["a", "b"]);
+    expect(sortProfileRuleCollections(sorted)).toBe(sorted);
   });
 });

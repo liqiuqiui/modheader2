@@ -1,35 +1,21 @@
 import type { Profile } from "./profile-model";
 
-export const PROFILE_DOCUMENT_SCHEMA_VERSION = 2 as const;
+export const PROFILE_DOCUMENT_SCHEMA_VERSION = 1 as const;
+
+export interface ProfileState {
+  profiles: Profile[];
+  selectedProfileId: string | null;
+}
 
 export interface ProfileDocument {
   schemaVersion: typeof PROFILE_DOCUMENT_SCHEMA_VERSION;
   revision: number;
   sourceId: string;
-  profilesById: Record<string, Profile>;
-  profileOrder: string[];
-  selectedProfileId: string | null;
+  state: ProfileState;
 }
 
-export interface ProfileSnapshot {
-  profilesById: Record<string, Profile>;
-  profileOrder: string[];
-  selectedProfileId: string | null;
-}
-
-export function createEmptyProfileDocument(): ProfileDocument {
-  return {
-    schemaVersion: PROFILE_DOCUMENT_SCHEMA_VERSION,
-    revision: 0,
-    sourceId: "",
-    profilesById: {},
-    profileOrder: [],
-    selectedProfileId: null,
-  };
-}
-
-export function createInitialProfileDocument(
-  profile: Profile,
+export function createProfileDocument(
+  state: ProfileState,
   sourceId: string,
   revision: number,
 ): ProfileDocument {
@@ -37,22 +23,39 @@ export function createInitialProfileDocument(
     schemaVersion: PROFILE_DOCUMENT_SCHEMA_VERSION,
     revision,
     sourceId,
-    profilesById: { [profile.id]: profile },
-    profileOrder: [profile.id],
-    selectedProfileId: profile.id,
+    state,
   };
 }
 
+export function createEmptyProfileDocument(): ProfileDocument {
+  return createProfileDocument({ profiles: [], selectedProfileId: null }, "", 0);
+}
+
+export function createInitialProfileDocument(
+  profile: Profile,
+  sourceId: string,
+  revision: number,
+): ProfileDocument {
+  return createProfileDocument(
+    {
+      profiles: [profile],
+      selectedProfileId: profile.id,
+    },
+    sourceId,
+    revision,
+  );
+}
+
 export function withPreferredProfileSelection(
-  snapshot: ProfileSnapshot,
+  state: ProfileState,
   preferredProfileId: string | null,
-): ProfileSnapshot {
+): ProfileState {
   if (
     !preferredProfileId ||
-    !Object.hasOwn(snapshot.profilesById, preferredProfileId) ||
-    snapshot.selectedProfileId === preferredProfileId
+    !state.profiles.some((profile) => profile.id === preferredProfileId) ||
+    state.selectedProfileId === preferredProfileId
   ) {
-    return snapshot;
+    return state;
   }
-  return { ...snapshot, selectedProfileId: preferredProfileId };
+  return { ...state, selectedProfileId: preferredProfileId };
 }

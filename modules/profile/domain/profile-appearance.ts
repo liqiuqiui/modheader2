@@ -7,6 +7,8 @@ function hslComponent(p: number, q: number, t: number): number {
   return p;
 }
 
+const profileTitleSegmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
 function toHex(component: number): string {
   return Math.round(component * 255)
     .toString(16)
@@ -28,12 +30,16 @@ function hslToHex(hue: number, saturation: number, lightness: number): string {
   )}${toHex(hslComponent(p, q, hue - 1 / 3))}`;
 }
 
+export function isProfileBackgroundColor(value: unknown): value is string {
+  return typeof value === "string" && /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value);
+}
+
 export function randomProfileColor(): string {
   return hslToHex(Math.random(), Math.random(), 0.1 + Math.random() * 0.45);
 }
 
 export function getProfileTextColor(backgroundColor: string): "black" | "white" {
-  if (!backgroundColor) return "white";
+  if (!isProfileBackgroundColor(backgroundColor)) return "white";
   const hex = backgroundColor.replace("#", "");
   const full = hex.length < 5 ? hex.replace(/./g, "$&$&") : hex;
   const value = Number.parseInt(full, 16);
@@ -45,6 +51,9 @@ export function getProfileTextColor(backgroundColor: string): "black" | "white" 
 }
 
 export function getProfileShortTitle(title: string): string {
-  const value = String(title);
-  return value.length > 0 ? value[value.length - 1] : "?";
+  let lastSegment = "?";
+  for (const { segment } of profileTitleSegmenter.segment(String(title))) {
+    lastSegment = segment;
+  }
+  return lastSegment;
 }

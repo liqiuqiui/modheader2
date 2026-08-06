@@ -1,7 +1,5 @@
 export type AppendMode = "override" | "append" | "comma";
 
-export type CspRuleMode = "directive";
-
 export interface HeaderRule {
   id: string;
   enabled: boolean;
@@ -10,7 +8,22 @@ export interface HeaderRule {
   comment: string;
   appendMode: AppendMode;
   sendEmptyHeader: boolean;
-  cspMode?: CspRuleMode;
+}
+
+export interface CspRule {
+  id: string;
+  enabled: boolean;
+  directive: string;
+  value: string;
+  comment: string;
+}
+
+export interface NameValueRule {
+  id: string;
+  enabled: boolean;
+  name: string;
+  value: string;
+  comment: string;
 }
 
 export const REQUEST_METHODS = [
@@ -79,59 +92,37 @@ export type ProfileFilterPatch = Partial<
   Pick<ProfileFilter, "enabled" | "mode" | "value" | "comment">
 >;
 
-export interface ProfileFilters {
-  byId: Record<string, ProfileFilter>;
-  order: string[];
+export interface ProfileRuleCollectionMap {
+  requestHeaders: HeaderRule;
+  responseHeaders: HeaderRule;
+  csp: CspRule;
+  cookies: NameValueRule;
+  redirects: NameValueRule;
 }
 
-export interface UrlReplacement {
-  id: string;
-  enabled: boolean;
-  name: string;
-  value: string;
-  comment: string;
-}
+export type ProfileRuleCollection = keyof ProfileRuleCollectionMap;
 
-export interface CookieRule {
-  id: string;
-  enabled: boolean;
-  name: string;
-  value: string;
-  comment: string;
-}
+export type ProfileRules = {
+  [Collection in ProfileRuleCollection]: ProfileRuleCollectionMap[Collection][];
+};
 
 export interface Profile {
   id: string;
   title: string;
-  shortTitle: string;
   backgroundColor: string;
-  textColor: string;
   enabled: boolean;
   paused: boolean;
-  hideComment: boolean;
-  headers: HeaderRule[];
-  respHeaders: HeaderRule[];
-  cookies: CookieRule[];
-  urlReplacements: UrlReplacement[];
-  filters: ProfileFilters;
+  rules: ProfileRules;
+  filters: ProfileFilter[];
 }
 
 export type ProfileMetadataPatch = Partial<
-  Pick<Profile, "title" | "backgroundColor" | "enabled" | "paused" | "hideComment">
+  Pick<Profile, "title" | "backgroundColor" | "enabled" | "paused">
 >;
 
-export interface ProfileRuleCollectionMap {
-  headers: HeaderRule;
-  respHeaders: HeaderRule;
-  csp: HeaderRule;
-  cookies: CookieRule;
-  urlReplacements: UrlReplacement;
-}
-
-export type ProfileRuleCollection = keyof ProfileRuleCollectionMap;
 export type ProfileRule = ProfileRuleCollectionMap[ProfileRuleCollection];
 export type ProfileRulePatch<K extends ProfileRuleCollection> = K extends "csp"
-  ? Partial<Pick<HeaderRule, "enabled" | "value" | "comment">>
-  : K extends "headers" | "respHeaders"
-    ? Partial<Omit<HeaderRule, "id" | "cspMode">>
-    : Partial<Omit<ProfileRuleCollectionMap[K], "id">>;
+  ? Partial<Omit<CspRule, "id">>
+  : K extends "requestHeaders" | "responseHeaders"
+    ? Partial<Omit<HeaderRule, "id">>
+    : Partial<Omit<NameValueRule, "id">>;

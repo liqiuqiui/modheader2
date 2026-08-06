@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createHeaderRule, createProfile } from "../../domain/profile-factory";
+import { createHeaderRule, createProfile, createRedirectRule } from "../../domain/profile-factory";
 import { createProfileFilter } from "../../domain/profile-filter";
 import { ProfileActionBadgeController } from "../profile-action-badge";
 import { compileProfileDnrRules } from "../profile-dnr";
@@ -40,17 +40,24 @@ function matchingProfile() {
     ...createProfileFilter({ id: "include-api", kind: "urlPattern" }),
     value: "*://api.example.com/*",
   };
+  const profile = createProfile({ title: "Test", id: "profile-1", backgroundColor: "#0f766e" });
   return {
-    ...createProfile({ title: "Test", id: "profile-1", backgroundColor: "#0f766e" }),
-    headers: [createHeaderRule({ id: "header-1", name: "authorization", value: "token" })],
-    filters: { byId: { [filter.id]: filter }, order: [filter.id] },
+    ...profile,
+    rules: {
+      ...profile.rules,
+      requestHeaders: [createHeaderRule({ id: "header-1", name: "authorization", value: "token" })],
+    },
+    filters: [filter],
   };
 }
 
 function withHeadersEnabled(profile: ReturnType<typeof matchingProfile>, enabled: boolean) {
   return {
     ...profile,
-    headers: profile.headers.map((rule) => ({ ...rule, enabled })),
+    rules: {
+      ...profile.rules,
+      requestHeaders: profile.rules.requestHeaders.map((rule) => ({ ...rule, enabled })),
+    },
   };
 }
 
@@ -250,6 +257,33 @@ describe("Profile action badge", () => {
     expect(browserMock.state.tabBadgeTexts.get(7)).toBe("");
   });
 
+  it("does not keep a stale badge visible when DNR rules are unavailable", async () => {
+    const profile = matchingProfile();
+    const controller = new ProfileActionBadgeController();
+    await controller.sync(profile, compileProfileDnrRules(profile).rules);
+    await controller.observeRequest(request());
+
+    // The background uses an empty rule set after a DNR apply failure. The
+    // configured profile still has enabled rows, but no rules are active.
+    await controller.sync(profile, []);
+
+    expect(browserMock.state.tabBadgeTexts.get(7)).toBe("");
+    expect(browserMock.state.globalBadgeText).toBe("");
+  });
+
+  it("restores session state only during the initial controller sync", async () => {
+    const profile = matchingProfile();
+    const rules = compileProfileDnrRules(profile).rules;
+    const controller = new ProfileActionBadgeController();
+
+    await controller.sync(profile, rules);
+    const initialReads = browserMock.storageSession.get.mock.calls.length;
+
+    await controller.sync(profile, rules);
+
+    expect(browserMock.storageSession.get).toHaveBeenCalledTimes(initialReads);
+  });
+
   it("restores a previous hit when a header is disabled and then enabled again", async () => {
     const profile = matchingProfile();
     const rules = compileProfileDnrRules(profile).rules;
@@ -274,15 +308,57 @@ describe("Profile action badge", () => {
     await controller.sync(profile, compileProfileDnrRules(profile).rules);
     await controller.observeRequest(request());
 
-    const filter = Object.values(profile.filters.byId)[0]!;
+    const filter = profile.filters[0]!;
     const changedScopeProfile = {
       ...profile,
-      filters: {
-        byId: { [filter.id]: { ...filter, value: "*://other.example.com/*" } },
-        order: [filter.id],
-      },
+      filters: [{ ...filter, value: "*://other.example.com/*" }],
     };
     await controller.sync(changedScopeProfile, compileProfileDnrRules(changedScopeProfile).rules);
+
+    expect(browserMock.state.tabBadgeTexts.get(7)).toBe("");
+    expect(browserMock.state.globalBadgeText).toBe("");
+  });
+
+  it("reconciles hits when a redirect rule is disabled", async () => {
+    const baseProfile = matchingProfile();
+    const profile = {
+      ...baseProfile,
+      filters: [],
+      rules: {
+        ...baseProfile.rules,
+        requestHeaders: [],
+        redirects: [
+          createRedirectRule({
+            id: "redirect-api",
+            name: "^https://api\\.example\\.com/.*$",
+            value: "https://new.example.com/",
+          }),
+          createRedirectRule({
+            id: "redirect-other",
+            name: "^https://other\\.example\\.com/.*$",
+            value: "https://other-new.example.com/",
+          }),
+        ],
+      },
+    };
+    const controller = new ProfileActionBadgeController();
+    await controller.sync(profile, compileProfileDnrRules(profile).rules);
+    await controller.observeRequest(request());
+    expect(browserMock.state.tabBadgeTexts.get(7)).toBe("2");
+
+    const disabledRedirectProfile = {
+      ...profile,
+      rules: {
+        ...profile.rules,
+        redirects: profile.rules.redirects.map((redirect) =>
+          redirect.id === "redirect-api" ? { ...redirect, enabled: false } : redirect,
+        ),
+      },
+    };
+    await controller.sync(
+      disabledRedirectProfile,
+      compileProfileDnrRules(disabledRedirectProfile).rules,
+    );
 
     expect(browserMock.state.tabBadgeTexts.get(7)).toBe("");
     expect(browserMock.state.globalBadgeText).toBe("");
@@ -297,10 +373,7 @@ describe("Profile action badge", () => {
     const tabFilter = createProfileFilter({ id: "current-tab", kind: "tab", currentTabId: 7 });
     const filteredProfile = {
       ...profile,
-      filters: {
-        byId: { ...profile.filters.byId, [tabFilter.id]: tabFilter },
-        order: [...profile.filters.order, tabFilter.id],
-      },
+      filters: [...profile.filters, tabFilter],
     };
     await controller.sync(filteredProfile, compileProfileDnrRules(filteredProfile).rules);
 
@@ -424,5 +497,49 @@ describe("Profile action badge", () => {
     await restartedController.sync(profile, rules);
 
     expect(browserMock.state.tabBadgeTexts.get(7)).toBe("");
+  });
+
+  it("coalesces queued session writes to the latest badge state", async () => {
+    const profile = matchingProfile();
+    const rules = compileProfileDnrRules(profile).rules;
+    const controller = new ProfileActionBadgeController();
+    await controller.sync(profile, rules);
+
+    let releaseFirstWrite: () => void = () => undefined;
+    const firstWriteBlocked = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    let writeCount = 0;
+    browserMock.storageSession.set.mockClear();
+    browserMock.storageSession.set.mockImplementation(async (values: Record<string, unknown>) => {
+      writeCount += 1;
+      if (writeCount === 1) await firstWriteBlocked;
+      Object.assign(browserMock.state.session, values);
+    });
+
+    const firstMatch = controller.observeRequest(request());
+    await vi.waitFor(() => expect(browserMock.storageSession.set).toHaveBeenCalledTimes(1));
+    const secondMatch = controller.observeRequest(
+      request({ requestId: "tab-8-request", tabId: 8 }),
+    );
+    const clearFirstTab = controller.observeRequest(
+      request({
+        initiator: undefined,
+        requestId: "navigation-2",
+        type: "main_frame",
+        url: "https://app.example.com/",
+      }),
+    );
+
+    releaseFirstWrite();
+    await Promise.all([firstMatch, secondMatch, clearFirstTab]);
+
+    expect(browserMock.storageSession.set).toHaveBeenCalledTimes(2);
+
+    browserMock.state.tabBadgeTexts.clear();
+    const restartedController = new ProfileActionBadgeController();
+    await restartedController.sync(profile, rules);
+    expect(browserMock.state.tabBadgeTexts.get(7) ?? "").toBe("");
+    expect(browserMock.state.tabBadgeTexts.get(8)).toBe("1");
   });
 });

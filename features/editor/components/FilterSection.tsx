@@ -1,16 +1,14 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DragDropProvider, type DragEndEvent } from "@dnd-kit/react";
 import { isSortableOperation } from "@dnd-kit/react/sortable";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
-import {
-  createProfileFilter,
-  orderedProfileFilters,
-} from "../../../modules/profile/domain/profile-filter";
+import { createProfileFilter } from "../../../modules/profile/domain/profile-filter";
 import type {
   FilterKind,
   FilterMode,
   Profile,
+  ProfileFilterPatch,
 } from "../../../modules/profile/domain/profile-model";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
 import type { BrowserTab } from "../../../types/browser";
@@ -49,7 +47,7 @@ export function FilterSection({
   const [draftKind, setDraftKind] = useState<FilterKind>("tab");
   const [draftMode, setDraftMode] = useState<FilterMode>("include");
   const [localFocusFilterId, setLocalFocusFilterId] = useState<string | null>(null);
-  const filters = useMemo(() => orderedProfileFilters(profile), [profile]);
+  const filters = profile.filters;
   const visibleFilters = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return filters;
@@ -66,6 +64,21 @@ export function FilterSection({
     [filters],
   );
   const sortableDisabled = searchQuery.trim().length > 0;
+
+  const handlePatch = useCallback(
+    (filterId: string, kind: FilterKind, patch: ProfileFilterPatch) =>
+      void patchFilter(profile.id, filterId, kind, patch),
+    [patchFilter, profile.id],
+  );
+  const handleKindChange = useCallback(
+    (filterId: string, kind: FilterKind) =>
+      void changeFilterKind(profile.id, filterId, kind, currentTab?.id),
+    [changeFilterKind, currentTab?.id, profile.id],
+  );
+  const handleDelete = useCallback(
+    (filterId: string) => void deleteFilter(profile.id, filterId),
+    [deleteFilter, profile.id],
+  );
 
   const handleAdd = (kind: FilterKind, mode: FilterMode = "include") => {
     const filter = createProfileFilter({ kind, mode, currentTabId: currentTab?.id });
@@ -143,11 +156,9 @@ export function FilterSection({
               autoFocusValue={filter.id === focusFilterId || filter.id === localFocusFilterId}
               tabs={tabs}
               currentTabId={currentTabId}
-              onPatch={(patch) => void patchFilter(profile.id, filter.id, filter.kind, patch)}
-              onKindChange={(kind) =>
-                void changeFilterKind(profile.id, filter.id, kind, currentTab?.id)
-              }
-              onDelete={() => void deleteFilter(profile.id, filter.id)}
+              onPatch={handlePatch}
+              onKindChange={handleKindChange}
+              onDelete={handleDelete}
               sortableIndex={filterIndices.get(filter.id) ?? 0}
               sortableDisabled={sortableDisabled}
               compact={compact}

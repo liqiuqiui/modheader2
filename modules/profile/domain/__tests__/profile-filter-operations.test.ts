@@ -10,18 +10,19 @@ import {
   sortProfileFilters,
 } from "../profile-filter-operations";
 import { createProfile } from "../profile-factory";
-import { createProfileFilter, orderedProfileFilters } from "../profile-filter";
+import { createProfileFilter } from "../profile-filter";
 import type { Profile } from "../profile-model";
 
 function emptyProfile(): Profile {
+  const profile = createProfile({ title: "Test", id: "profile-1", backgroundColor: "#2563eb" });
   return {
-    ...createProfile({ title: "Test", id: "profile-1", backgroundColor: "#2563eb" }),
-    headers: [],
+    ...profile,
+    rules: { ...profile.rules, requestHeaders: [] },
   };
 }
 
-describe("normalized Profile filter operations", () => {
-  it("adds, patches and deletes both the entity and its order entry", () => {
+describe("Profile filter array operations", () => {
+  it("adds, patches and deletes an entity in array order", () => {
     const filter = createProfileFilter({
       id: "filter-1",
       kind: "urlPattern",
@@ -35,23 +36,19 @@ describe("normalized Profile filter operations", () => {
       kind: "method",
     });
 
-    expect(added.filters.order).toEqual([filter.id]);
-    expect(patched.filters.byId[filter.id]).toMatchObject({
+    expect(added.filters).toEqual([filter]);
+    expect(patched.filters[0]).toMatchObject({
       id: filter.id,
       kind: "urlPattern",
       enabled: false,
       value: "*://example.com/*",
     });
-    expect(deleteProfileFilter(patched, filter.id).filters).toEqual({ byId: {}, order: [] });
+    expect(deleteProfileFilter(patched, filter.id).filters).toEqual([]);
   });
 
-  it("preserves metadata and order while changing kind", () => {
+  it("preserves metadata and position while changing kind", () => {
     const original = {
-      ...createProfileFilter({
-        id: "filter-1",
-        kind: "urlRegex",
-        mode: "exclude",
-      }),
+      ...createProfileFilter({ id: "filter-1", kind: "urlRegex", mode: "exclude" }),
       enabled: false,
       comment: "keep me",
       value: "example\\.com",
@@ -59,15 +56,16 @@ describe("normalized Profile filter operations", () => {
     const profile = addProfileFilter(emptyProfile(), original);
     const changed = changeProfileFilterKind(profile, original.id, "tab", 42);
 
-    expect(changed.filters.order).toEqual([original.id]);
-    expect(changed.filters.byId[original.id]).toEqual({
-      id: original.id,
-      kind: "tab",
-      mode: "exclude",
-      enabled: false,
-      comment: "keep me",
-      value: 42,
-    });
+    expect(changed.filters).toEqual([
+      {
+        id: original.id,
+        kind: "tab",
+        mode: "exclude",
+        enabled: false,
+        comment: "keep me",
+        value: 42,
+      },
+    ]);
   });
 
   it("treats invalid patches and true no-ops as reference-stable", () => {
@@ -81,7 +79,7 @@ describe("normalized Profile filter operations", () => {
     expect(reorderProfileFilters(profile, filter.id, filter.id)).toBe(profile);
   });
 
-  it("reorders and sorts order without rebuilding filter entities", () => {
+  it("reorders and sorts the array without rebuilding filter entities", () => {
     const method = createProfileFilter({ id: "method", kind: "method" });
     const url = {
       ...createProfileFilter({ id: "url", kind: "urlPattern" }),
@@ -95,10 +93,9 @@ describe("normalized Profile filter operations", () => {
     const reordered = reorderProfileFilters(profile, method.id, initiator.id);
     const sorted = sortProfileFilters(reordered);
 
-    expect(reordered.filters.order).toEqual([url.id, initiator.id, method.id]);
-    expect(sorted.filters.order).toEqual([url.id, initiator.id, method.id]);
-    expect(sorted.filters.byId).toBe(reordered.filters.byId);
-    expect(orderedProfileFilters(sorted).map((filter) => filter.id)).toEqual(sorted.filters.order);
+    expect(reordered.filters.map((filter) => filter.id)).toEqual([url.id, initiator.id, method.id]);
+    expect(sorted).toBe(reordered);
+    expect(reordered.filters[0]).toBe(url);
   });
 
   it("does not reinterpret a stale value patch after the filter kind changes", () => {
@@ -113,17 +110,17 @@ describe("normalized Profile filter operations", () => {
       comment: "comment still applies",
     });
 
-    expect(stalePatch.filters.byId[filter.id]).toMatchObject({
+    expect(stalePatch.filters[0]).toMatchObject({
       kind: "initiator",
       value: "",
       comment: "comment still applies",
     });
   });
 
-  it("clears the normalized collection atomically", () => {
+  it("clears the collection atomically", () => {
     const filter = createProfileFilter({ id: "filter-1", kind: "method" });
     const profile = addProfileFilter(emptyProfile(), filter);
 
-    expect(clearProfileFilters(profile).filters).toEqual({ byId: {}, order: [] });
+    expect(clearProfileFilters(profile).filters).toEqual([]);
   });
 });

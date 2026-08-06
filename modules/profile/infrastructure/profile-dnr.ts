@@ -4,17 +4,14 @@ import {
   CONTENT_SECURITY_POLICY_HEADER,
   createCspDirectiveValue,
   createContentSecurityPolicyValue,
-  isContentSecurityPolicyRule,
-  isCspDirectiveRule,
 } from "../domain/profile-csp";
-import { orderedProfileFilters } from "../domain/profile-filter";
 import { isNonNegativeInteger } from "../domain/profile-guards";
 import type {
-  CookieRule,
+  CspRule,
   HeaderRule,
+  NameValueRule,
   Profile,
   ProfileFilter,
-  UrlReplacement,
 } from "../domain/profile-model";
 
 export const PROFILE_DNR_RULE_ID_BASE = 10000;
@@ -72,19 +69,15 @@ function isEffectiveHeaderRule(rule: HeaderRule): boolean {
   return Boolean(rule.enabled && rule.name.trim() && (rule.value || rule.sendEmptyHeader));
 }
 
-function isEffectiveCspDirectiveRule(rule: HeaderRule): boolean {
-  return Boolean(
-    rule.enabled &&
-    isCspDirectiveRule(rule) &&
-    (createCspDirectiveValue(rule) || rule.sendEmptyHeader),
-  );
+function isEffectiveCspRule(rule: CspRule): boolean {
+  return Boolean(rule.enabled && rule.directive.trim() && createCspDirectiveValue(rule));
 }
 
-function isEffectiveCookieRule(cookie: CookieRule): boolean {
+function isEffectiveCookieRule(cookie: NameValueRule): boolean {
   return Boolean(cookie.enabled && cookie.name.trim());
 }
 
-function isEffectiveUrlReplacement(replacement: UrlReplacement): boolean {
+function isEffectiveRedirectRule(replacement: NameValueRule): boolean {
   return Boolean(replacement.enabled && replacement.name.trim() && replacement.value.trim());
 }
 
@@ -92,17 +85,16 @@ export function countEnabledProfileModifications(profile?: Profile): number {
   if (!profile?.enabled || profile.paused) return 0;
 
   return (
-    profile.headers.filter(isEffectiveHeaderRule).length +
-    profile.respHeaders.filter((rule) =>
-      isCspDirectiveRule(rule) ? isEffectiveCspDirectiveRule(rule) : isEffectiveHeaderRule(rule),
-    ).length +
-    profile.cookies.filter(isEffectiveCookieRule).length +
-    profile.urlReplacements.filter(isEffectiveUrlReplacement).length
+    profile.rules.requestHeaders.filter(isEffectiveHeaderRule).length +
+    profile.rules.responseHeaders.filter(isEffectiveHeaderRule).length +
+    profile.rules.csp.filter(isEffectiveCspRule).length +
+    profile.rules.cookies.filter(isEffectiveCookieRule).length +
+    profile.rules.redirects.filter(isEffectiveRedirectRule).length
   );
 }
 
 function activeFilters(profile: Profile): ProfileFilter[] {
-  return orderedProfileFilters(profile).filter(
+  return profile.filters.filter(
     (filter) =>
       filter.enabled &&
       !isNil(filter.value) &&
@@ -266,14 +258,12 @@ function headerRuleToDnr(
 }
 
 function contentSecurityPolicyToDnr(
-  rules: HeaderRule[],
-  operation: HeaderOperation,
+  rules: CspRule[],
   condition: DnrCondition,
   urlFilter?: UrlProfileFilter,
 ): PendingProfileDnrRule | null {
-  const value = createContentSecurityPolicyValue(rules);
-  const effectiveRules = rules.filter(isEffectiveCspDirectiveRule);
-  if (!value && effectiveRules.length === 0) return null;
+  const value = createContentSecurityPolicyValue(rules.filter(isEffectiveCspRule));
+  if (!value) return null;
 
   return {
     action: {
@@ -281,7 +271,7 @@ function contentSecurityPolicyToDnr(
       responseHeaders: [
         {
           header: CONTENT_SECURITY_POLICY_HEADER,
-          operation,
+          operation: "set",
           value,
         },
       ],
@@ -291,7 +281,7 @@ function contentSecurityPolicyToDnr(
 }
 
 function cookiesToDnr(
-  cookies: CookieRule[],
+  cookies: NameValueRule[],
   condition: DnrCondition,
   urlFilter?: UrlProfileFilter,
 ): PendingProfileDnrRule | null {
@@ -311,11 +301,11 @@ function cookiesToDnr(
 }
 
 function urlReplacementToDnr(
-  replacement: UrlReplacement,
+  replacement: NameValueRule,
   condition: DnrCondition,
 ): PendingProfileDnrRule | null {
   const regexFilter = replacement.name.trim();
-  if (!isEffectiveUrlReplacement(replacement)) return null;
+  if (!isEffectiveRedirectRule(replacement)) return null;
 
   return {
     action: {
@@ -363,7 +353,7 @@ export function compileProfileDnrRules(profile?: Profile): ProfileDnrCompilation
   const urlResult = compileUrlFilters(filters);
   if ("error" in urlResult) return failedCompilation(urlResult.error);
 
-  const enabledReplacements = profile.urlReplacements.filter(isEffectiveUrlReplacement);
+  const enabledReplacements = profile.rules.redirects.filter(isEffectiveRedirectRule);
   if (
     enabledReplacements.some(
       (replacement) =>
@@ -382,7 +372,7 @@ export function compileProfileDnrRules(profile?: Profile): ProfileDnrCompilation
     urlResult.included.length > 0 ? urlResult.included : [undefined];
   const actionRules: PendingProfileDnrRule[] = [];
 
-  for (const rule of profile.headers) {
+  for (const rule of profile.rules.requestHeaders) {
     for (const urlFilter of urlVariants) {
       const candidate = headerRuleToDnr(
         rule,
@@ -393,13 +383,7 @@ export function compileProfileDnrRules(profile?: Profile): ProfileDnrCompilation
       if (candidate) actionRules.push(candidate);
     }
   }
-  const contentSecurityPolicyRules = profile.respHeaders.filter(isCspDirectiveRule);
-  const hasEffectiveLegacyContentSecurityPolicy = profile.respHeaders.some(
-    (rule) =>
-      isContentSecurityPolicyRule(rule) && !isCspDirectiveRule(rule) && isEffectiveHeaderRule(rule),
-  );
-  for (const rule of profile.respHeaders) {
-    if (isCspDirectiveRule(rule)) continue;
+  for (const rule of profile.rules.responseHeaders) {
     for (const urlFilter of urlVariants) {
       const candidate = headerRuleToDnr(
         rule,
@@ -412,15 +396,14 @@ export function compileProfileDnrRules(profile?: Profile): ProfileDnrCompilation
   }
   for (const urlFilter of urlVariants) {
     const candidate = contentSecurityPolicyToDnr(
-      contentSecurityPolicyRules,
-      hasEffectiveLegacyContentSecurityPolicy ? "append" : "set",
+      profile.rules.csp,
       conditionResult.condition,
       urlFilter,
     );
     if (candidate) actionRules.push(candidate);
   }
   for (const urlFilter of urlVariants) {
-    const candidate = cookiesToDnr(profile.cookies, conditionResult.condition, urlFilter);
+    const candidate = cookiesToDnr(profile.rules.cookies, conditionResult.condition, urlFilter);
     if (candidate) actionRules.push(candidate);
   }
   for (const replacement of enabledReplacements) {
@@ -448,19 +431,20 @@ export function profileToDnrRules(profile?: Profile): ProfileDnrRule[] {
 }
 
 async function unsupportedRegexDiagnostics(rules: ProfileDnrRule[]): Promise<string[]> {
-  const diagnostics: string[] = [];
-  for (const rule of rules) {
-    const regex = rule.condition.regexFilter;
-    if (!regex) continue;
-    const result = await browser.declarativeNetRequest.isRegexSupported({
-      regex,
-      requireCapturing: rule.action.type === "redirect",
-    });
-    if (!result.isSupported) {
-      diagnostics.push(`${regex}: ${result.reason ?? "unsupported regular expression"}`);
-    }
-  }
-  return diagnostics;
+  const diagnostics = await Promise.all(
+    rules.map(async (rule) => {
+      const regex = rule.condition.regexFilter;
+      if (!regex) return null;
+      const result = await browser.declarativeNetRequest.isRegexSupported({
+        regex,
+        requireCapturing: rule.action.type === "redirect",
+      });
+      return result.isSupported
+        ? null
+        : `${regex}: ${result.reason ?? "unsupported regular expression"}`;
+    }),
+  );
+  return diagnostics.flatMap((diagnostic) => (diagnostic ? [diagnostic] : []));
 }
 
 async function clearManagedDnrRules(): Promise<void> {

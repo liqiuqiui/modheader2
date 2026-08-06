@@ -1,17 +1,18 @@
 import { clsx } from "clsx";
 import { X } from "lucide-react";
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../../../components/ui/switch";
-import type { UrlReplacement } from "../../../modules/profile/domain/profile-model";
+import type { NameValueRule } from "../../../modules/profile/domain/profile-model";
 
-export function RedirectRuleRow({
+function RedirectRuleRowComponent({
   replacement,
   onChange,
   onDelete,
 }: {
-  replacement: UrlReplacement;
-  onChange: (patch: Partial<UrlReplacement>) => void;
-  onDelete: () => void;
+  replacement: NameValueRule;
+  onChange: (ruleId: string, patch: Partial<NameValueRule>) => void;
+  onDelete: (ruleId: string) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -23,7 +24,7 @@ export function RedirectRuleRow({
     >
       <Switch
         checked={replacement.enabled}
-        onCheckedChange={(enabled) => onChange({ enabled })}
+        onCheckedChange={(enabled) => onChange(replacement.id, { enabled })}
         aria-label={t("redirect.enable")}
       />
       <input
@@ -31,7 +32,7 @@ export function RedirectRuleRow({
         className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-normal outline-none focus:ring-2 focus:ring-[var(--theme-color)]"
         placeholder={t("redirect.patternPlaceholder")}
         value={replacement.name}
-        onChange={(event) => onChange({ name: event.target.value })}
+        onChange={(event) => onChange(replacement.id, { name: event.target.value })}
       />
       <span className="text-slate-400">→</span>
       <input
@@ -39,12 +40,12 @@ export function RedirectRuleRow({
         className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-normal outline-none focus:ring-2 focus:ring-[var(--theme-color)]"
         placeholder={t("redirect.targetPlaceholder")}
         value={replacement.value}
-        onChange={(event) => onChange({ value: event.target.value })}
+        onChange={(event) => onChange(replacement.id, { value: event.target.value })}
       />
       <button
         type="button"
         aria-label={t("redirect.delete")}
-        onClick={onDelete}
+        onClick={() => onDelete(replacement.id)}
         className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
       >
         <X aria-hidden="true" className="h-4 w-4" />
@@ -52,3 +53,5 @@ export function RedirectRuleRow({
     </div>
   );
 }
+
+export const RedirectRuleRow = memo(RedirectRuleRowComponent);

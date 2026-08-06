@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { createUrlReplacement } from "../../../modules/profile/domain/profile-factory";
-import type { UrlReplacement } from "../../../modules/profile/domain/profile-model";
+import { createRedirectRule } from "../../../modules/profile/domain/profile-factory";
+import type { NameValueRule } from "../../../modules/profile/domain/profile-model";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
 import { EmptyState } from "./EmptyState";
 import { RedirectRuleRow } from "./RedirectRuleRow";
@@ -14,7 +14,7 @@ export function RedirectSection({
   searchQuery,
 }: {
   profileId: string;
-  replacements: UrlReplacement[];
+  replacements: NameValueRule[];
   searchQuery: string;
 }) {
   const { t } = useTranslation();
@@ -29,6 +29,15 @@ export function RedirectSection({
     (item) => !query || `${item.name} ${item.value} ${item.comment}`.toLowerCase().includes(query),
   );
   const enabled = replacements.some((item) => item.enabled);
+  const handleChange = useCallback(
+    (ruleId: string, patch: Partial<NameValueRule>) =>
+      void patchRule(profileId, "redirects", ruleId, patch),
+    [patchRule, profileId],
+  );
+  const handleDelete = useCallback(
+    (ruleId: string) => void deleteRule(profileId, "redirects", ruleId),
+    [deleteRule, profileId],
+  );
   return (
     <section>
       <SectionHeader
@@ -37,20 +46,20 @@ export function RedirectSection({
         open={open}
         enabled={enabled}
         onToggle={() => setOpen((current) => !current)}
-        onToggleEnabled={() => void setRulesEnabled(profileId, "urlReplacements", !enabled)}
+        onToggleEnabled={() => void setRulesEnabled(profileId, "redirects", !enabled)}
         onAdd={() => {
-          void addRule(profileId, "urlReplacements", createUrlReplacement());
+          void addRule(profileId, "redirects", createRedirectRule());
           setOpen(true);
         }}
-        onClear={() => void clearRules(profileId, "urlReplacements")}
+        onClear={() => void clearRules(profileId, "redirects")}
       />
       <SectionContent open={open} className="space-y-2">
         {visible.map((item) => (
           <RedirectRuleRow
             key={item.id}
             replacement={item}
-            onChange={(patch) => void patchRule(profileId, "urlReplacements", item.id, patch)}
-            onDelete={() => void deleteRule(profileId, "urlReplacements", item.id)}
+            onChange={handleChange}
+            onDelete={handleDelete}
           />
         ))}
         {replacements.length === 0 && <EmptyState label={t("redirect.none")} />}

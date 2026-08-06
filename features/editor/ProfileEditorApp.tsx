@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { clsx } from "clsx";
 import { browser } from "wxt/browser";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { ThemePortalProvider } from "../../components/ThemePortalProvider";
 import {
   createProfileExportDocument,
@@ -30,18 +31,19 @@ function EditorNoticeToast() {
 export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage === "en" ? "en" : "zh-CN";
-  const status = useProfileStore((state) => state.status);
-  const error = useProfileStore((state) => state.error);
-  const hasProfile = useProfileStore((state) =>
-    state.selectedProfileId ? Boolean(state.profilesById[state.selectedProfileId]) : false,
-  );
-  const themeColor = useProfileStore((state) =>
-    state.selectedProfileId
-      ? state.profilesById[state.selectedProfileId]?.backgroundColor
-      : undefined,
-  );
-  const profilePaused = useProfileStore((state) =>
-    state.selectedProfileId ? state.profilesById[state.selectedProfileId]?.paused : false,
+  const { status, error, hasProfile, themeColor, profilePaused } = useProfileStore(
+    useShallow((state) => {
+      const selected = state.selectedProfileId
+        ? state.profiles.find((profile) => profile.id === state.selectedProfileId)
+        : undefined;
+      return {
+        status: state.status,
+        error: state.error,
+        hasProfile: Boolean(selected),
+        themeColor: selected?.backgroundColor,
+        profilePaused: selected?.paused ?? false,
+      };
+    }),
   );
   const titleRef = useRef<HTMLInputElement>(null);
   const renameRequestedRef = useRef(false);

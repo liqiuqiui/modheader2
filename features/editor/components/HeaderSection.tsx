@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import { HeaderRuleRow } from "../../../components/HeaderRuleRow";
@@ -27,7 +27,7 @@ export function HeaderSection({
 }: {
   profileId: string;
   title: string;
-  collection: Extract<ProfileRuleCollection, "headers" | "respHeaders">;
+  collection: Extract<ProfileRuleCollection, "requestHeaders" | "responseHeaders">;
   rules: HeaderRule[];
   searchQuery: string;
   focusRuleId?: string | null;
@@ -55,7 +55,45 @@ export function HeaderSection({
 
   const enabled = rules.some((rule) => rule.enabled);
   const nameSuggestions =
-    collection === "headers" ? REQUEST_HEADER_NAME_SUGGESTIONS : RESPONSE_HEADER_NAME_SUGGESTIONS;
+    collection === "requestHeaders"
+      ? REQUEST_HEADER_NAME_SUGGESTIONS
+      : RESPONSE_HEADER_NAME_SUGGESTIONS;
+
+  const handleChange = useCallback(
+    (ruleId: string, patch: Partial<HeaderRule>) => {
+      void patchRule(profileId, collection, ruleId, patch);
+      if (
+        collection === "responseHeaders" &&
+        typeof patch.name === "string" &&
+        isContentSecurityPolicyHeaderName(patch.name)
+      ) {
+        requestFocus("csp", ruleId);
+      }
+    },
+    [collection, patchRule, profileId, requestFocus],
+  );
+  const handleDelete = useCallback(
+    (ruleId: string) => void deleteRule(profileId, collection, ruleId),
+    [collection, deleteRule, profileId],
+  );
+  const handleClone = useCallback(
+    (ruleId: string) => {
+      const cloneId = createHeaderRule().id;
+      setLocalFocusRuleId(cloneId);
+      void cloneRule(profileId, collection, ruleId, cloneId);
+      setOpen(true);
+    },
+    [cloneRule, collection, profileId],
+  );
+  const handleConvert = useCallback(
+    (ruleId: string) =>
+      void convertHeader(
+        profileId,
+        ruleId,
+        collection === "requestHeaders" ? "responseHeaders" : "requestHeaders",
+      ),
+    [collection, convertHeader, profileId],
+  );
 
   return (
     <section>
@@ -81,34 +119,11 @@ export function HeaderSection({
             rule={rule}
             nameSuggestions={nameSuggestions}
             autoFocus={rule.id === focusRuleId || rule.id === localFocusRuleId}
-            onChange={(patch) => {
-              void patchRule(profileId, collection, rule.id, patch);
-              if (
-                collection === "respHeaders" &&
-                typeof patch.name === "string" &&
-                isContentSecurityPolicyHeaderName(patch.name)
-              ) {
-                requestFocus("csp", rule.id);
-              }
-            }}
-            onDelete={() => void deleteRule(profileId, collection, rule.id)}
-            onClone={() => {
-              const cloneId = createHeaderRule().id;
-              setLocalFocusRuleId(cloneId);
-              void cloneRule(profileId, collection, rule.id, cloneId);
-              setOpen(true);
-            }}
+            onChange={handleChange}
+            onDelete={handleDelete}
+            onClone={handleClone}
             convertLabel={convertLabel}
-            onConvert={
-              convertLabel
-                ? () =>
-                    void convertHeader(
-                      profileId,
-                      rule.id,
-                      collection === "headers" ? "respHeaders" : "headers",
-                    )
-                : undefined
-            }
+            onConvert={convertLabel ? handleConvert : undefined}
             compact={compact}
           />
         ))}

@@ -1,12 +1,13 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { clsx } from "clsx";
 import { Copy, MoreHorizontal, X } from "lucide-react";
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../../../components/ui/switch";
-import type { CookieRule } from "../../../modules/profile/domain/profile-model";
+import type { NameValueRule } from "../../../modules/profile/domain/profile-model";
 import { menuItemClass } from "./styles";
 
-export function CookieRuleRow({
+function CookieRuleRowComponent({
   cookie,
   compact,
   autoFocus,
@@ -14,12 +15,12 @@ export function CookieRuleRow({
   onDelete,
   onClone,
 }: {
-  cookie: CookieRule;
+  cookie: NameValueRule;
   compact: boolean;
   autoFocus: boolean;
-  onChange: (patch: Partial<CookieRule>) => void;
-  onDelete: () => void;
-  onClone: () => void;
+  onChange: (ruleId: string, patch: Partial<NameValueRule>) => void;
+  onDelete: (ruleId: string) => void;
+  onClone: (ruleId: string) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -32,7 +33,7 @@ export function CookieRuleRow({
     >
       <Switch
         checked={cookie.enabled}
-        onCheckedChange={(enabled) => onChange({ enabled })}
+        onCheckedChange={(enabled) => onChange(cookie.id, { enabled })}
         aria-label={t("cookie.enable")}
         className="shrink-0"
       />
@@ -42,7 +43,7 @@ export function CookieRuleRow({
         placeholder={t("cookie.namePlaceholder")}
         value={cookie.name}
         autoFocus={autoFocus}
-        onChange={(event) => onChange({ name: event.target.value })}
+        onChange={(event) => onChange(cookie.id, { name: event.target.value })}
         spellCheck={false}
       />
       <input
@@ -50,13 +51,13 @@ export function CookieRuleRow({
         className="h-8 min-w-0 flex-[1.4] rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-normal outline-none transition hover:bg-white focus:ring-2 focus:ring-[var(--theme-color)]"
         placeholder={t("cookie.valuePlaceholder")}
         value={cookie.value}
-        onChange={(event) => onChange({ value: event.target.value })}
+        onChange={(event) => onChange(cookie.id, { value: event.target.value })}
         spellCheck={false}
       />
       <button
         type="button"
         aria-label={t("cookie.delete")}
-        onClick={onDelete}
+        onClick={() => onDelete(cookie.id)}
         className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
       >
         <X aria-hidden="true" className="h-4 w-4" />
@@ -77,7 +78,7 @@ export function CookieRuleRow({
             sideOffset={6}
             className="z-[100] min-w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
           >
-            <DropdownMenu.Item className={menuItemClass} onSelect={onClone}>
+            <DropdownMenu.Item className={menuItemClass} onSelect={() => onClone(cookie.id)}>
               <Copy aria-hidden="true" className="h-3.5 w-3.5" /> {t("cookie.clone")}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
@@ -86,3 +87,5 @@ export function CookieRuleRow({
     </div>
   );
 }
+
+export const CookieRuleRow = memo(CookieRuleRowComponent);

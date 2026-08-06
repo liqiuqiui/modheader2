@@ -5,7 +5,7 @@ import {
   createCookieRule,
   createCspRule,
   createHeaderRule,
-  createUrlReplacement,
+  createRedirectRule,
 } from "../../../modules/profile/domain/profile-factory";
 import { createProfileFilter } from "../../../modules/profile/domain/profile-filter";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
@@ -45,7 +45,7 @@ export function QuickAddActions() {
               onSelect={() => {
                 const nextRule = createHeaderRule();
                 requestFocus("header", nextRule.id);
-                void addRule(profileId, "headers", nextRule);
+                void addRule(profileId, "requestHeaders", nextRule);
               }}
             >
               {t("section.requestHeaders")}
@@ -55,7 +55,7 @@ export function QuickAddActions() {
               onSelect={() => {
                 const nextRule = createHeaderRule();
                 requestFocus("header", nextRule.id);
-                void addRule(profileId, "respHeaders", nextRule);
+                void addRule(profileId, "responseHeaders", nextRule);
               }}
             >
               {t("section.responseHeaders")}
@@ -72,7 +72,7 @@ export function QuickAddActions() {
             </DropdownMenu.Item>
             <DropdownMenu.Item
               className={menuItemClass}
-              onSelect={() => void addRule(profileId, "urlReplacements", createUrlReplacement())}
+              onSelect={() => void addRule(profileId, "redirects", createRedirectRule())}
             >
               {t("section.urlRedirects")}
             </DropdownMenu.Item>

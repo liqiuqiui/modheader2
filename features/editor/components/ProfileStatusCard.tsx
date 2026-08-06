@@ -26,14 +26,15 @@ export function ProfileStatusCard() {
         <span className="rounded-full bg-slate-100 px-2 py-1">
           {t("mod.count", {
             count:
-              profile.headers.length +
-              profile.respHeaders.length +
-              profile.cookies.length +
-              profile.urlReplacements.length,
+              profile.rules.requestHeaders.length +
+              profile.rules.responseHeaders.length +
+              profile.rules.csp.length +
+              profile.rules.cookies.length +
+              profile.rules.redirects.length,
           })}
         </span>
         <span className="rounded-full bg-slate-100 px-2 py-1">
-          {t("filter.count", { count: profile.filters.order.length })}
+          {t("filter.count", { count: profile.filters.length })}
         </span>
       </div>
     </div>

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import { CONTENT_SECURITY_POLICY_HEADER } from "../../../modules/profile/domain/profile-csp";
 import { createCspRule } from "../../../modules/profile/domain/profile-factory";
-import type { HeaderRule } from "../../../modules/profile/domain/profile-model";
+import type { CspRule } from "../../../modules/profile/domain/profile-model";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
 import { CspRuleRow } from "./CspRuleRow";
 import { EmptyState } from "./EmptyState";
@@ -18,7 +18,7 @@ export function CspSection({
   compact = false,
 }: {
   profileId: string;
-  rules: HeaderRule[];
+  rules: CspRule[];
   searchQuery: string;
   focusRuleId?: string | null;
   compact?: boolean;
@@ -48,10 +48,30 @@ export function CspSection({
       (rule) =>
         rule.id === focusRuleId ||
         rule.id === localFocusRuleId ||
-        `${aliases} ${rule.value} ${rule.comment}`.toLowerCase().includes(query),
+        `${aliases} ${rule.directive} ${rule.value} ${rule.comment}`.toLowerCase().includes(query),
     );
   }, [focusRuleId, localFocusRuleId, rules, searchQuery, t, title]);
   const enabled = rules.some((rule) => rule.enabled);
+  const handleChange = useCallback(
+    (ruleId: string, patch: Partial<CspRule>) => void patchRule(profileId, "csp", ruleId, patch),
+    [patchRule, profileId],
+  );
+  const handleDelete = useCallback(
+    (ruleId: string) => void deleteRule(profileId, "csp", ruleId),
+    [deleteRule, profileId],
+  );
+  const handleFocusLeave = useCallback((ruleId: string) => {
+    setLocalFocusRuleId((current) => (current === ruleId ? null : current));
+  }, []);
+  const handleClone = useCallback(
+    (ruleId: string) => {
+      const cloneId = createCspRule().id;
+      setLocalFocusRuleId(cloneId);
+      void cloneRule(profileId, "csp", ruleId, cloneId);
+      setOpen(true);
+    },
+    [cloneRule, profileId],
+  );
 
   return (
     <section aria-label={title}>
@@ -76,17 +96,10 @@ export function CspSection({
             key={rule.id}
             rule={rule}
             autoFocus={rule.id === focusRuleId || rule.id === localFocusRuleId}
-            onChange={(patch) => void patchRule(profileId, "csp", rule.id, patch)}
-            onDelete={() => void deleteRule(profileId, "csp", rule.id)}
-            onFocusLeave={() =>
-              setLocalFocusRuleId((current) => (current === rule.id ? null : current))
-            }
-            onClone={() => {
-              const cloneId = createCspRule().id;
-              setLocalFocusRuleId(cloneId);
-              void cloneRule(profileId, "csp", rule.id, cloneId);
-              setOpen(true);
-            }}
+            onChange={handleChange}
+            onDelete={handleDelete}
+            onFocusLeave={handleFocusLeave}
+            onClone={handleClone}
             compact={compact}
           />
         ))}

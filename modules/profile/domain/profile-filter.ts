@@ -2,14 +2,13 @@ import { nanoid } from "nanoid";
 import type {
   FilterKind,
   FilterMode,
-  Profile,
   ProfileFilter,
   ProfileFilterByKind,
   RequestMethod,
   ResourceType,
 } from "./profile-model";
 import { FILTER_KINDS, FILTER_MODES, REQUEST_METHODS, RESOURCE_TYPES } from "./profile-model";
-import { isNonEmptyString, isNonNegativeInteger, isRecord } from "./profile-guards";
+import { hasExactKeys, isNonEmptyString, isNonNegativeInteger, isRecord } from "./profile-guards";
 
 const FILTER_KIND_SET = new Set<string>(FILTER_KINDS);
 const FILTER_MODE_SET = new Set<string>(FILTER_MODES);
@@ -44,6 +43,7 @@ export function isFilterValue(kind: FilterKind, value: unknown): value is Profil
 export function isProfileFilter(value: unknown): value is ProfileFilter {
   if (
     !isRecord(value) ||
+    !hasExactKeys(value, ["id", "enabled", "kind", "mode", "value", "comment"]) ||
     !isNonEmptyString(value.id) ||
     typeof value.enabled !== "boolean" ||
     !isFilterKind(value.kind) ||
@@ -78,11 +78,4 @@ export function createProfileFilter<K extends FilterKind>({
     return { ...common, kind, value: "get" } as ProfileFilterByKind<K>;
   }
   return { ...common, kind, value: "" } as ProfileFilterByKind<K>;
-}
-
-export function orderedProfileFilters(profile: Profile): ProfileFilter[] {
-  return profile.filters.order.flatMap((filterId) => {
-    const filter = profile.filters.byId[filterId];
-    return filter ? [filter] : [];
-  });
 }

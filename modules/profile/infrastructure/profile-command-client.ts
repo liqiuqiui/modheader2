@@ -3,19 +3,21 @@ import { browser } from "wxt/browser";
 import type { ProfileCommand } from "../application/profile-command";
 import type { ProfileDocument } from "../domain/profile-document";
 import {
-  isProfileCommandResponse,
+  parseProfileCommandResponse,
   PROFILE_COMMAND_CHANNEL,
   type ProfileCommandMessage,
 } from "./profile-command-protocol";
 
+const DEFAULT_PROFILE_COMMAND_TIMEOUT_MS = 10_000;
+
 export interface ProfileCommandClient {
   clientId: string;
-  sendProfileCommand: (command: ProfileCommand) => Promise<ProfileDocument>;
   enqueueProfileCommand: (command: ProfileCommand) => Promise<ProfileDocument>;
 }
 
 export interface ProfileCommandClientOptions {
   clientId?: string;
+  requestTimeoutMs?: number;
   sendMessage: (message: ProfileCommandMessage) => Promise<unknown>;
 }
 
@@ -29,8 +31,8 @@ function resolveProfileCommandResponse(
   return outcomePromise.then((outcome) => {
     if (outcome.status === "rejected") throw outcome.error;
 
-    const response = outcome.response;
-    if (!isProfileCommandResponse(response)) {
+    const response = parseProfileCommandResponse(outcome.response);
+    if (!response) {
       throw new Error("Invalid response from profile background");
     }
     if (!response.ok) throw new Error(response.error);
@@ -38,11 +40,45 @@ function resolveProfileCommandResponse(
   });
 }
 
+function settleProfileCommandRequest(
+  request: Promise<unknown>,
+  timeoutMs: number,
+): Promise<ProfileCommandRequestOutcome> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const finish = (outcome: ProfileCommandRequestOutcome) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== undefined) globalThis.clearTimeout(timeoutId);
+      resolve(outcome);
+    };
+    timeoutId = globalThis.setTimeout(
+      () =>
+        finish({
+          status: "rejected",
+          error: new Error(`Profile command timed out after ${timeoutMs}ms`),
+        }),
+      timeoutMs,
+    );
+    request.then(
+      (response) => finish({ status: "fulfilled", response }),
+      (error: unknown) => finish({ status: "rejected", error }),
+    );
+  });
+}
+
 export function createProfileCommandClient({
   clientId = nanoid(),
+  requestTimeoutMs = DEFAULT_PROFILE_COMMAND_TIMEOUT_MS,
   sendMessage,
 }: ProfileCommandClientOptions): ProfileCommandClient {
-  let responseQueue: Promise<void> = Promise.resolve();
+  // Keep queued commands bounded to one in-flight runtime request. The
+  // background also serializes document mutations, so starting every request
+  // eagerly only creates an unbounded message/storage backlog. The first
+  // command still starts synchronously; subsequent commands wait until the
+  // previous response has settled (including validation failures).
+  let commandQueue: Promise<void> | null = null;
 
   const startProfileCommand = (command: ProfileCommand): Promise<ProfileCommandRequestOutcome> => {
     const message: ProfileCommandMessage = {
@@ -52,29 +88,24 @@ export function createProfileCommandClient({
     };
 
     try {
-      return sendMessage(message).then(
-        (response) => ({ status: "fulfilled", response }),
-        (error: unknown) => ({ status: "rejected", error }),
-      );
+      return settleProfileCommandRequest(sendMessage(message), requestTimeoutMs);
     } catch (error) {
       return Promise.resolve({ status: "rejected", error });
     }
   };
 
-  const sendProfileCommand = (command: ProfileCommand): Promise<ProfileDocument> =>
-    resolveProfileCommandResponse(startProfileCommand(command));
-
   const enqueueProfileCommand = (command: ProfileCommand): Promise<ProfileDocument> => {
-    const outcome = startProfileCommand(command);
-    const result = responseQueue.then(() => resolveProfileCommandResponse(outcome));
-    responseQueue = result.then(
+    const result = commandQueue
+      ? commandQueue.then(() => resolveProfileCommandResponse(startProfileCommand(command)))
+      : resolveProfileCommandResponse(startProfileCommand(command));
+    commandQueue = result.then(
       () => undefined,
       () => undefined,
     );
     return result;
   };
 
-  return { clientId, sendProfileCommand, enqueueProfileCommand };
+  return { clientId, enqueueProfileCommand };
 }
 
 const defaultProfileCommandClient = createProfileCommandClient({
@@ -82,7 +113,5 @@ const defaultProfileCommandClient = createProfileCommandClient({
 });
 
 export const PROFILE_COMMAND_CLIENT_ID = defaultProfileCommandClient.clientId;
-
-export const sendProfileCommand = defaultProfileCommandClient.sendProfileCommand;
 
 export const enqueueProfileCommand = defaultProfileCommandClient.enqueueProfileCommand;

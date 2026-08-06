@@ -4,7 +4,7 @@ import {
   createCspRule,
   createHeaderRule,
   createProfile,
-  createUrlReplacement,
+  createRedirectRule,
 } from "../../domain/profile-factory";
 import { createProfileFilter } from "../../domain/profile-filter";
 import type { Profile, ProfileFilter } from "../../domain/profile-model";
@@ -20,12 +20,16 @@ function profileWithFilters(filters: ProfileFilter[]): Profile {
   const profile = createProfile({ title: "Test", id: "profile-1", backgroundColor: "#2563eb" });
   return {
     ...profile,
-    headers: [createHeaderRule({ id: "header-1", name: "x-test", value: "1" })],
-    filters: {
-      byId: Object.fromEntries(filters.map((filter) => [filter.id, filter])),
-      order: filters.map((filter) => filter.id),
+    rules: {
+      ...profile.rules,
+      requestHeaders: [createHeaderRule({ id: "header-1", name: "x-test", value: "1" })],
     },
+    filters,
   };
+}
+
+function withRules(profile: Profile, rules: Partial<Profile["rules"]>): Profile {
+  return { ...profile, rules: { ...profile.rules, ...rules } };
 }
 
 function modifyHeaderRule(profile: Profile) {
@@ -57,8 +61,8 @@ const invalidEnabledIncludes: Array<{
 
 describe("Profile DNR compilation", () => {
   it("counts effective enabled modification rows instead of compiled DNR rules", () => {
-    const profile = {
-      ...profileWithFilters([
+    const profile = withRules(
+      profileWithFilters([
         {
           ...createProfileFilter({ id: "include-one", kind: "urlPattern" }),
           value: "*://one.example/*",
@@ -68,37 +72,41 @@ describe("Profile DNR compilation", () => {
           value: "*://two.example/*",
         },
       ]),
-      headers: [
-        createHeaderRule({ id: "request-active", name: "authorization", value: "token" }),
-        createHeaderRule({ id: "request-draft", name: "", value: "draft" }),
-        createHeaderRule({
-          id: "request-empty",
-          name: "x-empty",
-          value: "",
-          sendEmptyHeader: true,
-        }),
-      ],
-      respHeaders: [
-        createHeaderRule({ id: "response-active", name: "x-response", value: "1" }),
-        createCspRule({ id: "csp-active", value: "default-src 'self'" }),
-        createCspRule({ id: "csp-draft", value: "\t'self'" }),
-      ],
-      cookies: [
-        createCookieRule({ id: "cookie-active", name: "session", value: "" }),
-        createCookieRule({ id: "cookie-disabled", name: "ignored", enabled: false }),
-      ],
-      urlReplacements: [
-        createUrlReplacement({
-          id: "redirect-active",
-          name: "^https://old\\.example/(.*)$",
-          value: "https://new.example/$1",
-        }),
-        createUrlReplacement({ id: "redirect-draft", name: "^https://draft\\.example/" }),
-      ],
-    };
+      {
+        requestHeaders: [
+          createHeaderRule({ id: "request-active", name: "authorization", value: "token" }),
+          createHeaderRule({ id: "request-draft", name: "", value: "draft" }),
+          createHeaderRule({
+            id: "request-empty",
+            name: "x-empty",
+            value: "",
+            sendEmptyHeader: true,
+          }),
+        ],
+        responseHeaders: [
+          createHeaderRule({ id: "response-active", name: "x-response", value: "1" }),
+        ],
+        csp: [
+          createCspRule({ id: "csp-active", directive: "default-src", value: "'self'" }),
+          createCspRule({ id: "csp-draft", directive: "", value: "'self'" }),
+        ],
+        cookies: [
+          createCookieRule({ id: "cookie-active", name: "session", value: "" }),
+          createCookieRule({ id: "cookie-disabled", name: "ignored", enabled: false }),
+        ],
+        redirects: [
+          createRedirectRule({
+            id: "redirect-active",
+            name: "^https://old\\.example/(.*)$",
+            value: "https://new.example/$1",
+          }),
+          createRedirectRule({ id: "redirect-draft", name: "^https://draft\\.example/" }),
+        ],
+      },
+    );
 
     expect(countEnabledProfileModifications(profile)).toBe(6);
-    expect(compileProfileDnrRules({ ...profile, urlReplacements: [] }).rules).toHaveLength(10);
+    expect(compileProfileDnrRules(withRules(profile, { redirects: [] })).rules).toHaveLength(10);
   });
 
   it("counts no modifications while the profile is disabled or paused", () => {
@@ -285,21 +293,23 @@ describe("Profile DNR compilation", () => {
 
   it("does not emit an empty header unless sendEmptyHeader is enabled", () => {
     const base = profileWithFilters([]);
-    const skipped = compileProfileDnrRules({
-      ...base,
-      headers: [createHeaderRule({ id: "empty-skipped", name: "x-empty", value: "" })],
-    });
-    const emitted = compileProfileDnrRules({
-      ...base,
-      headers: [
-        createHeaderRule({
-          id: "empty-emitted",
-          name: "x-empty",
-          value: "",
-          sendEmptyHeader: true,
-        }),
-      ],
-    });
+    const skipped = compileProfileDnrRules(
+      withRules(base, {
+        requestHeaders: [createHeaderRule({ id: "empty-skipped", name: "x-empty", value: "" })],
+      }),
+    );
+    const emitted = compileProfileDnrRules(
+      withRules(base, {
+        requestHeaders: [
+          createHeaderRule({
+            id: "empty-emitted",
+            name: "x-empty",
+            value: "",
+            sendEmptyHeader: true,
+          }),
+        ],
+      }),
+    );
 
     expect(skipped).toEqual({ rules: [], diagnostics: [] });
     expect(emitted.diagnostics).toEqual([]);
@@ -313,18 +323,17 @@ describe("Profile DNR compilation", () => {
   });
 
   it("combines CSP directives into one dedicated response header rule", () => {
-    const profile = {
-      ...profileWithFilters([]),
-      headers: [],
-      respHeaders: [
-        createHeaderRule({ id: "response-1", name: "x-response", value: "1" }),
-        createCspRule({ id: "csp-1", value: "default-src 'self';" }),
-        createCspRule({ id: "csp-2", value: "script-src 'none'" }),
-        createCspRule({ id: "csp-3", value: "upgrade-insecure-requests" }),
-        createCspRule({ id: "csp-draft", value: "\t'self'" }),
-        createCspRule({ id: "csp-disabled", value: "img-src data:", enabled: false }),
+    const profile = withRules(profileWithFilters([]), {
+      requestHeaders: [],
+      responseHeaders: [createHeaderRule({ id: "response-1", name: "x-response", value: "1" })],
+      csp: [
+        createCspRule({ id: "csp-1", directive: "default-src", value: "'self';" }),
+        createCspRule({ id: "csp-2", directive: "script-src", value: "'none'" }),
+        createCspRule({ id: "csp-3", directive: "upgrade-insecure-requests" }),
+        createCspRule({ id: "csp-draft", directive: "", value: "'self'" }),
+        createCspRule({ id: "csp-disabled", directive: "img-src", value: "data:", enabled: false }),
       ],
-    };
+    });
     const rules = compileProfileDnrRules(profile).rules;
 
     expect(rules).toHaveLength(2);
@@ -348,120 +357,21 @@ describe("Profile DNR compilation", () => {
     });
   });
 
-  it("preserves the append mode for a single legacy CSP response rule", () => {
-    const profile = {
-      ...profileWithFilters([]),
-      headers: [],
-      respHeaders: [
-        createHeaderRule({
-          id: "csp-append",
-          name: "Content-Security-Policy",
-          value: "frame-ancestors 'none'",
-          appendMode: "append",
-        }),
-        createHeaderRule({ id: "csp-empty-draft", name: "Content-Security-Policy" }),
-      ],
-    };
-
-    expect(compileProfileDnrRules(profile).rules[0]).toMatchObject({
-      action: {
-        type: "modifyHeaders",
-        responseHeaders: [
-          {
-            header: "Content-Security-Policy",
-            operation: "append",
-            value: "frame-ancestors 'none'",
-          },
-        ],
-      },
-    });
-  });
-
-  it("keeps legacy CSP headers separate while combining new directive rows", () => {
-    const profile = {
-      ...profileWithFilters([]),
-      headers: [],
-      respHeaders: [
-        createHeaderRule({
-          id: "legacy-default",
-          name: "Content-Security-Policy",
-          value: "default-src 'none'",
-          appendMode: "append",
-        }),
-        createHeaderRule({
-          id: "legacy-image",
-          name: "content-security-policy",
-          value: "img-src https://cdn.example",
-          appendMode: "append",
-        }),
-        createCspRule({
-          id: "directive-script",
-          value: "script-src\t'self'",
-          appendMode: "append",
-        }),
-        createCspRule({
-          id: "directive-upgrade",
-          value: "upgrade-insecure-requests",
-        }),
-      ],
-    };
-    const rules = compileProfileDnrRules(profile).rules;
-
-    expect(rules).toHaveLength(3);
-    expect(rules.map((rule) => rule.action)).toEqual([
-      {
-        type: "modifyHeaders",
-        responseHeaders: [
-          {
-            header: "Content-Security-Policy",
-            operation: "append",
-            value: "default-src 'none'",
-          },
-        ],
-      },
-      {
-        type: "modifyHeaders",
-        responseHeaders: [
-          {
-            header: "content-security-policy",
-            operation: "append",
-            value: "img-src https://cdn.example",
-          },
-        ],
-      },
-      {
-        type: "modifyHeaders",
-        responseHeaders: [
-          {
-            header: "Content-Security-Policy",
-            operation: "append",
-            value: "script-src 'self'; upgrade-insecure-requests",
-          },
-        ],
-      },
-    ]);
-  });
-
-  it("places a directive group after legacy CSP so its append operation remains effective", () => {
-    const profile = {
-      ...profileWithFilters([]),
-      headers: [],
-      respHeaders: [
+  it("places the merged CSP rule after ordinary response headers", () => {
+    const profile = withRules(profileWithFilters([]), {
+      requestHeaders: [],
+      responseHeaders: [createHeaderRule({ id: "response", name: "x-response", value: "1" })],
+      csp: [
         createCspRule({
           id: "directive-disabled",
-          value: "default-src 'self'",
+          directive: "default-src",
+          value: "'self'",
           enabled: false,
         }),
-        createCspRule({ id: "directive-active", value: "script-src 'none'" }),
-        createHeaderRule({
-          id: "legacy-csp",
-          name: "Content-Security-Policy",
-          value: "frame-ancestors 'none'",
-          appendMode: "append",
-        }),
-        createCspRule({ id: "directive-draft", value: "\t'self'" }),
+        createCspRule({ id: "directive-active", directive: "script-src", value: "'none'" }),
+        createCspRule({ id: "directive-draft", directive: "", value: "'self'" }),
       ],
-    };
+    });
     const rules = compileProfileDnrRules(profile).rules;
 
     expect(rules).toHaveLength(2);
@@ -470,9 +380,9 @@ describe("Profile DNR compilation", () => {
       action: {
         responseHeaders: [
           {
-            header: "Content-Security-Policy",
-            operation: "append",
-            value: "frame-ancestors 'none'",
+            header: "x-response",
+            operation: "set",
+            value: "1",
           },
         ],
       },
@@ -483,7 +393,7 @@ describe("Profile DNR compilation", () => {
         responseHeaders: [
           {
             header: "Content-Security-Policy",
-            operation: "append",
+            operation: "set",
             value: "script-src 'none'",
           },
         ],
@@ -491,12 +401,11 @@ describe("Profile DNR compilation", () => {
     });
   });
 
-  it("does not emit a CSP header for separator-only directive drafts", () => {
-    const profile = {
-      ...profileWithFilters([]),
-      headers: [],
-      respHeaders: [createCspRule({ id: "csp-separators", value: ";;;" })],
-    };
+  it("does not emit a CSP header for an empty directive draft", () => {
+    const profile = withRules(profileWithFilters([]), {
+      requestHeaders: [],
+      csp: [createCspRule({ id: "csp-draft", directive: "", value: "'self'" })],
+    });
 
     expect(compileProfileDnrRules(profile)).toEqual({ rules: [], diagnostics: [] });
   });
@@ -506,16 +415,15 @@ describe("Profile DNR compilation", () => {
       ...createProfileFilter({ id: "url-include", kind: "urlPattern" }),
       value: "*://example.com/*",
     };
-    const profile = {
-      ...profileWithFilters([include]),
-      urlReplacements: [
-        createUrlReplacement({
+    const profile = withRules(profileWithFilters([include]), {
+      redirects: [
+        createRedirectRule({
           id: "redirect-1",
           name: "^https://example\\.com/(.*)$",
           value: "https://mirror.example/$1",
         }),
       ],
-    };
+    });
 
     expect(compileProfileDnrRules(profile)).toEqual({
       rules: [],
@@ -530,30 +438,34 @@ describe("Profile DNR compilation", () => {
     const invalidHeaders = Array.from({ length: 150 }, (_, index) =>
       createHeaderRule({ id: `invalid-${index}`, name: "", value: "1" }),
     );
-    const firstValid = profileToDnrRules({
-      ...base,
-      headers: [...invalidHeaders, createHeaderRule({ id: "valid", name: "x-valid", value: "1" })],
-    });
+    const firstValid = profileToDnrRules(
+      withRules(base, {
+        requestHeaders: [
+          ...invalidHeaders,
+          createHeaderRule({ id: "valid", name: "x-valid", value: "1" }),
+        ],
+      }),
+    );
     expect(firstValid).toHaveLength(1);
     expect(firstValid[0].id).toBe(PROFILE_DNR_RULE_ID_BASE);
 
-    const fullRange = profileToDnrRules({
-      ...base,
-      headers: Array.from({ length: MAX_PROFILE_DNR_RULES }, (_, index) =>
-        createHeaderRule({ id: `valid-${index}`, name: `x-valid-${index}`, value: "1" }),
-      ),
-    });
+    const fullRange = profileToDnrRules(
+      withRules(base, {
+        requestHeaders: Array.from({ length: MAX_PROFILE_DNR_RULES }, (_, index) =>
+          createHeaderRule({ id: `valid-${index}`, name: `x-valid-${index}`, value: "1" }),
+        ),
+      }),
+    );
     expect(fullRange).toHaveLength(MAX_PROFILE_DNR_RULES);
     expect(fullRange.at(-1)?.id).toBe(PROFILE_DNR_RULE_ID_BASE + MAX_PROFILE_DNR_RULES - 1);
   });
 
   it("fails the whole profile with a diagnostic when it exceeds the managed range", () => {
-    const profile = {
-      ...profileWithFilters([]),
-      headers: Array.from({ length: 120 }, (_, index) =>
+    const profile = withRules(profileWithFilters([]), {
+      requestHeaders: Array.from({ length: 120 }, (_, index) =>
         createHeaderRule({ id: `valid-${index}`, name: `x-valid-${index}`, value: "1" }),
       ),
-    };
+    });
 
     expect(compileProfileDnrRules(profile)).toEqual({
       rules: [],
@@ -568,26 +480,25 @@ describe("Profile DNR compilation", () => {
       ...createProfileFilter({ id: "exclude-private", kind: "urlPattern", mode: "exclude" }),
       value: "*://example.com/private/*",
     };
-    const profile: Profile = {
-      ...profileWithFilters([exclude]),
-      headers: [
+    const profile = withRules(profileWithFilters([exclude]), {
+      requestHeaders: [
         createHeaderRule({ id: "request-1", name: "x-request-1", value: "1" }),
         createHeaderRule({ id: "request-2", name: "x-request-2", value: "2" }),
       ],
-      respHeaders: [createHeaderRule({ id: "response-1", name: "x-response-1", value: "1" })],
-      urlReplacements: [
-        createUrlReplacement({
+      responseHeaders: [createHeaderRule({ id: "response-1", name: "x-response-1", value: "1" })],
+      redirects: [
+        createRedirectRule({
           id: "redirect-1",
           name: "^https://old-1\\.example/(.*)$",
           value: "https://new-1.example/$1",
         }),
-        createUrlReplacement({
+        createRedirectRule({
           id: "redirect-2",
           name: "^https://old-2\\.example/(.*)$",
           value: "https://new-2.example/$1",
         }),
       ],
-    };
+    });
     const first = compileProfileDnrRules(profile).rules;
     const second = compileProfileDnrRules(profile).rules;
 

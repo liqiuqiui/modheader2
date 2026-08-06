@@ -1,5 +1,6 @@
 import { isArray } from "lodash-es";
 import { browser } from "wxt/browser";
+import { getProfileTextColor } from "../domain/profile-appearance";
 import { isArrayOf, isNonNegativeInteger, isRecord } from "../domain/profile-guards";
 import type { Profile } from "../domain/profile-model";
 import { countEnabledProfileModifications, type ProfileDnrRule } from "./profile-dnr";
@@ -38,7 +39,7 @@ interface StoredBadgeRuntimeState {
 function getRequestScopeKey(profile: Profile | undefined): string {
   if (!profile) return JSON.stringify({ profileId: null, filters: [], redirectPatterns: [] });
 
-  const filters = Object.values(profile.filters.byId)
+  const filters = profile.filters
     .map((filter) => ({
       enabled: filter.enabled,
       kind: filter.kind,
@@ -46,10 +47,13 @@ function getRequestScopeKey(profile: Profile | undefined): string {
       value: filter.value,
     }))
     .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
-  const redirectPatterns = profile.urlReplacements
-    .map((replacement) => ({ id: replacement.id, name: replacement.name.trim() }))
+  const redirectPatterns = profile.rules.redirects
+    .map((replacement) => ({
+      enabled: replacement.enabled,
+      name: replacement.name.trim(),
+    }))
     .filter((replacement) => replacement.name.length > 0)
-    .sort((left, right) => left.id.localeCompare(right.id));
+    .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
   return JSON.stringify({ profileId: profile.id, filters, redirectPatterns });
 }
 
@@ -109,10 +113,15 @@ export class ProfileActionBadgeController {
   };
   private globalBadgeQueue: Promise<void> = Promise.resolve();
   private runtimeStatePersistenceQueue: Promise<void> = Promise.resolve();
+  private pendingRuntimeState: StoredBadgeRuntimeState | null = null;
+  private runtimeStatePersistenceRunning = false;
   private tabBadgeQueues = new Map<number, Promise<void>>();
 
   async sync(profile: Profile | undefined, rules: ProfileDnrRule[]): Promise<void> {
-    const modificationCount = countEnabledProfileModifications(profile);
+    // An empty rule set means that no profile changes are currently active. This
+    // is also the failure path used by the background DNR sync, so do not render
+    // stale matches while keeping the profile's configured rows intact.
+    const modificationCount = rules.length > 0 ? countEnabledProfileModifications(profile) : 0;
     const nextRequestScopeKey = getRequestScopeKey(profile);
     const previousRequestScopeKey = this.runtime.requestScopeKey;
     const wasDisabled = this.runtime.modificationCount === 0;
@@ -127,13 +136,14 @@ export class ProfileActionBadgeController {
     if (profile) {
       globalUpdates.push(
         browser.action.setBadgeBackgroundColor({ color: profile.backgroundColor }),
-        browser.action.setBadgeTextColor({ color: profile.textColor }),
+        browser.action.setBadgeTextColor({ color: getProfileTextColor(profile.backgroundColor) }),
       );
     }
     await Promise.all(globalUpdates);
 
-    const storedState = await this.readStoredRuntimeState();
-    if (!this.initialized) {
+    const shouldRestoreStoredState = !this.initialized;
+    const storedState = shouldRestoreStoredState ? await this.readStoredRuntimeState() : null;
+    if (shouldRestoreStoredState) {
       this.initialized = true;
       if (storedState) {
         await this.restoreRuntimeState(storedState);
@@ -279,16 +289,15 @@ export class ProfileActionBadgeController {
     this.resetTabTracking();
 
     const tabs = await browser.tabs.query({});
-    const existingTabIds = new Set(
-      tabs.flatMap((tab) => (typeof tab.id === "number" ? [tab.id] : [])),
-    );
-    const eligibleMatchedTabIds = new Set(
-      tabs.flatMap((tab) =>
-        typeof tab.id === "number" && (typeof tab.url !== "string" || isHttpUrl(tab.url))
-          ? [tab.id]
-          : [],
-      ),
-    );
+    const existingTabIds = new Set<number>();
+    const eligibleMatchedTabIds = new Set<number>();
+    for (const tab of tabs) {
+      if (typeof tab.id !== "number") continue;
+      existingTabIds.add(tab.id);
+      if (typeof tab.url !== "string" || isHttpUrl(tab.url)) {
+        eligibleMatchedTabIds.add(tab.id);
+      }
+    }
     for (const tabId of state.matchedTabIds) {
       if (eligibleMatchedTabIds.has(tabId)) this.matchingTabIds.add(tabId);
     }
@@ -421,23 +430,31 @@ export class ProfileActionBadgeController {
   }
 
   private queueRuntimeStatePersistence(): Promise<void> {
-    const value: StoredBadgeRuntimeState = {
+    this.pendingRuntimeState = {
       requestScopeKey: this.runtime.requestScopeKey,
       matchedTabIds: [...this.matchingTabIds].sort((left, right) => left - right),
       matchedRequests: [...this.requestSamplesByTabId].sort(([left], [right]) => left - right),
       mainFrameRequestIds: [...this.mainFrameRequestIds].sort(([left], [right]) => left - right),
     };
-    const next = this.runtimeStatePersistenceQueue
-      .catch(() => undefined)
-      .then(async () => {
-        try {
-          await browser.storage.session.set({ [RUNTIME_STATE_STORAGE_KEY]: value });
-        } catch {
-          // Session persistence is an optimization; request matching still works without it.
-        }
-      });
-    this.runtimeStatePersistenceQueue = next;
-    return next;
+
+    if (!this.runtimeStatePersistenceRunning) {
+      this.runtimeStatePersistenceRunning = true;
+      this.runtimeStatePersistenceQueue = this.flushRuntimeStatePersistence();
+    }
+    return this.runtimeStatePersistenceQueue;
+  }
+
+  private async flushRuntimeStatePersistence(): Promise<void> {
+    while (this.pendingRuntimeState) {
+      const value = this.pendingRuntimeState;
+      this.pendingRuntimeState = null;
+      try {
+        await browser.storage.session.set({ [RUNTIME_STATE_STORAGE_KEY]: value });
+      } catch {
+        // Session persistence is an optimization; request matching still works without it.
+      }
+    }
+    this.runtimeStatePersistenceRunning = false;
   }
 }
 

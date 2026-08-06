@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import { createCookieRule } from "../../../modules/profile/domain/profile-factory";
-import type { CookieRule } from "../../../modules/profile/domain/profile-model";
+import type { NameValueRule } from "../../../modules/profile/domain/profile-model";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
 import { CookieRuleRow } from "./CookieRuleRow";
 import { EmptyState } from "./EmptyState";
@@ -17,7 +17,7 @@ export function CookieSection({
   compact = false,
 }: {
   profileId: string;
-  cookies: CookieRule[];
+  cookies: NameValueRule[];
   searchQuery: string;
   focusCookieId?: string | null;
   compact?: boolean;
@@ -37,6 +37,23 @@ export function CookieSection({
       !query || `${cookie.name} ${cookie.value} ${cookie.comment}`.toLowerCase().includes(query),
   );
   const enabled = cookies.some((cookie) => cookie.enabled);
+  const handleChange = useCallback(
+    (ruleId: string, patch: Partial<NameValueRule>) =>
+      void patchRule(profileId, "cookies", ruleId, patch),
+    [patchRule, profileId],
+  );
+  const handleDelete = useCallback(
+    (ruleId: string) => void deleteRule(profileId, "cookies", ruleId),
+    [deleteRule, profileId],
+  );
+  const handleClone = useCallback(
+    (ruleId: string) => {
+      const cloneId = createCookieRule().id;
+      setLocalFocusCookieId(cloneId);
+      void cloneRule(profileId, "cookies", ruleId, cloneId);
+    },
+    [cloneRule, profileId],
+  );
 
   return (
     <section>
@@ -62,13 +79,9 @@ export function CookieSection({
             cookie={cookie}
             compact={compact}
             autoFocus={cookie.id === focusCookieId || cookie.id === localFocusCookieId}
-            onChange={(patch) => void patchRule(profileId, "cookies", cookie.id, patch)}
-            onDelete={() => void deleteRule(profileId, "cookies", cookie.id)}
-            onClone={() => {
-              const cloneId = createCookieRule().id;
-              setLocalFocusCookieId(cloneId);
-              void cloneRule(profileId, "cookies", cookie.id, cloneId);
-            }}
+            onChange={handleChange}
+            onDelete={handleDelete}
+            onClone={handleClone}
           />
         ))}
         {!compact && cookies.length === 0 && (

@@ -1,48 +1,58 @@
-import type {
-  CookieRule,
-  HeaderRule,
-  Profile,
-  ProfileFilters,
-  UrlReplacement,
-} from "./profile-model";
-import type { ProfileDocument, ProfileSnapshot } from "./profile-document";
+import { isContentSecurityPolicyHeaderRule } from "./profile-csp";
+import { isProfileBackgroundColor } from "./profile-appearance";
+import type { ProfileDocument, ProfileState } from "./profile-document";
 import { PROFILE_DOCUMENT_SCHEMA_VERSION } from "./profile-document";
 import { isProfileFilter } from "./profile-filter";
 import {
-  hasOnlyKeys,
-  isArrayOf,
+  hasExactKeys,
   isAppendMode,
+  isArrayOf,
   isNonEmptyString,
   isNonNegativeInteger,
-  isOrderedEntityRecord,
   isRecord,
 } from "./profile-guards";
+import type { CspRule, HeaderRule, NameValueRule, Profile, ProfileRules } from "./profile-model";
 import { profileEntityIds } from "./profile-operations";
-
-function isStringArray(value: unknown): value is string[] {
-  return isArrayOf(value, (item): item is string => typeof item === "string");
-}
 
 export function isHeaderRule(value: unknown): value is HeaderRule {
   return (
     isRecord(value) &&
-    typeof value.id === "string" &&
-    value.id.length > 0 &&
+    hasExactKeys(value, [
+      "id",
+      "enabled",
+      "name",
+      "value",
+      "comment",
+      "appendMode",
+      "sendEmptyHeader",
+    ]) &&
+    isNonEmptyString(value.id) &&
     typeof value.enabled === "boolean" &&
     typeof value.name === "string" &&
     typeof value.value === "string" &&
     typeof value.comment === "string" &&
     isAppendMode(value.appendMode) &&
-    typeof value.sendEmptyHeader === "boolean" &&
-    (value.cspMode === undefined || value.cspMode === "directive")
+    typeof value.sendEmptyHeader === "boolean"
   );
 }
 
-export function isCookieRule(value: unknown): value is CookieRule {
+export function isCspRule(value: unknown): value is CspRule {
   return (
     isRecord(value) &&
-    typeof value.id === "string" &&
-    value.id.length > 0 &&
+    hasExactKeys(value, ["id", "enabled", "directive", "value", "comment"]) &&
+    isNonEmptyString(value.id) &&
+    typeof value.enabled === "boolean" &&
+    typeof value.directive === "string" &&
+    typeof value.value === "string" &&
+    typeof value.comment === "string"
+  );
+}
+
+export function isNameValueRule(value: unknown): value is NameValueRule {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["id", "enabled", "name", "value", "comment"]) &&
+    isNonEmptyString(value.id) &&
     typeof value.enabled === "boolean" &&
     typeof value.name === "string" &&
     typeof value.value === "string" &&
@@ -50,74 +60,70 @@ export function isCookieRule(value: unknown): value is CookieRule {
   );
 }
 
-export function isUrlReplacement(value: unknown): value is UrlReplacement {
-  return isCookieRule(value);
-}
-
-export function isProfileFilters(value: unknown): value is ProfileFilters {
-  if (!isRecord(value) || !isRecord(value.byId) || !isStringArray(value.order)) return false;
-  return isOrderedEntityRecord(value.byId, value.order, isProfileFilter);
+export function isProfileRules(value: unknown): value is ProfileRules {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["requestHeaders", "responseHeaders", "csp", "cookies", "redirects"]) &&
+    isArrayOf(value.requestHeaders, isHeaderRule) &&
+    isArrayOf(value.responseHeaders, isHeaderRule) &&
+    value.responseHeaders.every((rule) => !isContentSecurityPolicyHeaderRule(rule)) &&
+    isArrayOf(value.csp, isCspRule) &&
+    isArrayOf(value.cookies, isNameValueRule) &&
+    isArrayOf(value.redirects, isNameValueRule)
+  );
 }
 
 export function isProfile(value: unknown): value is Profile {
   if (
     !isRecord(value) ||
+    !hasExactKeys(value, [
+      "id",
+      "title",
+      "backgroundColor",
+      "enabled",
+      "paused",
+      "rules",
+      "filters",
+    ]) ||
     !isNonEmptyString(value.id) ||
     typeof value.title !== "string" ||
-    typeof value.shortTitle !== "string" ||
-    !isNonEmptyString(value.backgroundColor) ||
-    typeof value.textColor !== "string" ||
+    !isProfileBackgroundColor(value.backgroundColor) ||
     typeof value.enabled !== "boolean" ||
     typeof value.paused !== "boolean" ||
-    typeof value.hideComment !== "boolean" ||
-    !isArrayOf(value.headers, isHeaderRule) ||
-    !isArrayOf(value.respHeaders, isHeaderRule) ||
-    !isArrayOf(value.cookies, isCookieRule) ||
-    !isArrayOf(value.urlReplacements, isUrlReplacement) ||
-    !isProfileFilters(value.filters)
+    !isProfileRules(value.rules) ||
+    !isArrayOf(value.filters, isProfileFilter)
   ) {
     return false;
   }
 
-  const profile = value as unknown as Profile;
-  const entityIds = profileEntityIds(profile);
+  const entityIds = profileEntityIds(value as unknown as Profile);
   return new Set(entityIds).size === entityIds.length;
 }
 
-export function isProfileDocument(value: unknown): value is ProfileDocument {
+export function isProfileState(value: unknown): value is ProfileState {
   if (
     !isRecord(value) ||
-    value.schemaVersion !== PROFILE_DOCUMENT_SCHEMA_VERSION ||
-    !isNonNegativeInteger(value.revision) ||
-    typeof value.sourceId !== "string" ||
-    !isRecord(value.profilesById) ||
-    !isStringArray(value.profileOrder) ||
+    !hasExactKeys(value, ["profiles", "selectedProfileId"]) ||
+    !isArrayOf(value.profiles, isProfile) ||
     (value.selectedProfileId !== null && typeof value.selectedProfileId !== "string")
   ) {
     return false;
   }
 
-  const profilesById = value.profilesById;
-  const profileOrder = value.profileOrder;
-  const selectedProfileId = value.selectedProfileId;
-  if (!isOrderedEntityRecord(profilesById, profileOrder, isProfile)) return false;
-  if (profileOrder.length === 0) return selectedProfileId === null;
-  return selectedProfileId !== null && profileOrder.includes(selectedProfileId);
+  const profiles = value.profiles;
+  const profileIds = profiles.map((profile) => profile.id);
+  if (new Set(profileIds).size !== profileIds.length) return false;
+  if (profiles.length === 0) return value.selectedProfileId === null;
+  return value.selectedProfileId !== null && profileIds.includes(value.selectedProfileId);
 }
 
-export function isProfileSnapshot(value: unknown): value is ProfileSnapshot {
-  if (
-    !isRecord(value) ||
-    !hasOnlyKeys(value, ["profilesById", "profileOrder", "selectedProfileId"])
-  ) {
-    return false;
-  }
-  return isProfileDocument({
-    schemaVersion: PROFILE_DOCUMENT_SCHEMA_VERSION,
-    revision: 0,
-    sourceId: "",
-    profilesById: value.profilesById,
-    profileOrder: value.profileOrder,
-    selectedProfileId: value.selectedProfileId,
-  });
+export function isProfileDocument(value: unknown): value is ProfileDocument {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["schemaVersion", "revision", "sourceId", "state"]) &&
+    value.schemaVersion === PROFILE_DOCUMENT_SCHEMA_VERSION &&
+    isNonNegativeInteger(value.revision) &&
+    typeof value.sourceId === "string" &&
+    isProfileState(value.state)
+  );
 }

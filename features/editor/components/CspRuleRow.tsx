@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { clsx } from "clsx";
 import { Copy, MessageSquarePlus, MessageSquareX, MoreHorizontal, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { HeaderRule } from "../../../modules/profile/domain/profile-model";
-import { joinCspDirective, splitCspDirective } from "../../../modules/profile/domain/profile-csp";
+import type { CspRule } from "../../../modules/profile/domain/profile-model";
 import { Input } from "../../../components/ui/input";
 import { Switch } from "../../../components/ui/switch";
 
-export function CspRuleRow({
+function CspRuleRowComponent({
   rule,
   onChange,
   onDelete,
@@ -17,11 +16,11 @@ export function CspRuleRow({
   autoFocus,
   compact = false,
 }: {
-  rule: HeaderRule;
-  onChange: (patch: Partial<HeaderRule>) => void;
-  onDelete: () => void;
-  onClone?: () => void;
-  onFocusLeave?: () => void;
+  rule: CspRule;
+  onChange: (ruleId: string, patch: Partial<CspRule>) => void;
+  onDelete: (ruleId: string) => void;
+  onClone?: (ruleId: string) => void;
+  onFocusLeave?: (ruleId: string) => void;
   autoFocus?: boolean;
   compact?: boolean;
 }) {
@@ -31,8 +30,7 @@ export function CspRuleRow({
   const directiveRef = useRef<HTMLInputElement>(null);
   const directiveValueRef = useRef<HTMLInputElement>(null);
   const autoFocusHandledRef = useRef(false);
-  const { directive, directiveValue } = splitCspDirective(rule.value);
-  const directiveLabel = directive || t("csp.unnamed");
+  const directiveLabel = rule.directive || t("csp.unnamed");
 
   useEffect(() => {
     if (rule.comment) setShowComment(true);
@@ -45,9 +43,8 @@ export function CspRuleRow({
     }
     if (autoFocusHandledRef.current) return;
     autoFocusHandledRef.current = true;
-    const currentDirective = splitCspDirective(rule.value).directive;
-    (currentDirective ? directiveValueRef : directiveRef).current?.focus();
-  }, [autoFocus, rule.value]);
+    (rule.directive ? directiveValueRef : directiveRef).current?.focus();
+  }, [autoFocus, rule.directive]);
 
   return (
     <div
@@ -57,7 +54,7 @@ export function CspRuleRow({
         const nextTarget = event.relatedTarget;
         if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
         if (nextTarget instanceof HTMLElement && nextTarget.closest('[role="menu"]')) return;
-        onFocusLeave?.();
+        onFocusLeave?.(rule.id);
       }}
       className={clsx(
         "group rounded-lg border bg-white transition",
@@ -68,7 +65,7 @@ export function CspRuleRow({
       <div className="flex items-center gap-2">
         <Switch
           checked={rule.enabled}
-          onCheckedChange={(enabled) => onChange({ enabled })}
+          onCheckedChange={(enabled) => onChange(rule.id, { enabled })}
           aria-label={t(rule.enabled ? "csp.disableRule" : "csp.enableRule", {
             directive: directiveLabel,
           })}
@@ -79,10 +76,8 @@ export function CspRuleRow({
           aria-label={t("csp.directive")}
           className="h-8 min-w-0 flex-[0.85] border-slate-200 bg-slate-50 font-mono text-xs font-normal shadow-none focus-visible:bg-white"
           placeholder={t("csp.directivePlaceholder")}
-          value={directive}
-          onChange={(event) =>
-            onChange({ value: joinCspDirective(event.target.value, directiveValue) })
-          }
+          value={rule.directive}
+          onChange={(event) => onChange(rule.id, { directive: event.target.value })}
           spellCheck={false}
         />
         <Input
@@ -90,15 +85,15 @@ export function CspRuleRow({
           aria-label={t("csp.value")}
           className="h-8 min-w-0 flex-[1.4] border-slate-200 bg-slate-50 font-mono text-xs font-normal shadow-none focus-visible:bg-white"
           placeholder={t("csp.valuePlaceholder")}
-          value={directiveValue}
-          onChange={(event) => onChange({ value: joinCspDirective(directive, event.target.value) })}
+          value={rule.value}
+          onChange={(event) => onChange(rule.id, { value: event.target.value })}
           spellCheck={false}
         />
         <button
           type="button"
           aria-label={t("csp.deleteRule", { directive: directiveLabel })}
           className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-          onClick={onDelete}
+          onClick={() => onDelete(rule.id)}
         >
           <Trash2 aria-hidden="true" className="h-4 w-4" />
         </button>
@@ -124,7 +119,7 @@ export function CspRuleRow({
                 onSelect={() => {
                   if (showComment) {
                     setShowComment(false);
-                    onChange({ comment: "" });
+                    onChange(rule.id, { comment: "" });
                     return;
                   }
                   setShowComment(true);
@@ -141,7 +136,7 @@ export function CspRuleRow({
               {onClone && (
                 <DropdownMenu.Item
                   className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs outline-none transition hover:bg-slate-100 focus:bg-slate-100"
-                  onSelect={onClone}
+                  onSelect={() => onClone?.(rule.id)}
                 >
                   <Copy aria-hidden="true" className="h-3.5 w-3.5" /> {t("csp.clone")}
                 </DropdownMenu.Item>
@@ -158,10 +153,12 @@ export function CspRuleRow({
             className="h-8 border-dashed border-slate-200 bg-transparent text-xs font-normal text-slate-500 shadow-none"
             placeholder={t("csp.commentPlaceholder")}
             value={rule.comment}
-            onChange={(event) => onChange({ comment: event.target.value })}
+            onChange={(event) => onChange(rule.id, { comment: event.target.value })}
           />
         </div>
       )}
     </div>
   );
 }
+
+export const CspRuleRow = memo(CspRuleRowComponent);

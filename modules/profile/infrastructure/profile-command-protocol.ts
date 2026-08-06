@@ -1,8 +1,9 @@
 import type { ProfileCommand } from "../application/profile-command";
-import { isCspDirectiveRule } from "../domain/profile-csp";
+import { isProfileBackgroundColor } from "../domain/profile-appearance";
 import type { ProfileDocument } from "../domain/profile-document";
 import { isFilterKind, isFilterMode, isProfileFilter } from "../domain/profile-filter";
 import {
+  hasExactKeys,
   hasOnlyKeys,
   isArrayOf,
   isAppendMode,
@@ -13,15 +14,15 @@ import {
 } from "../domain/profile-guards";
 import type { ProfileRuleCollection } from "../domain/profile-model";
 import {
-  isCookieRule,
+  isCspRule,
   isHeaderRule,
+  isNameValueRule,
   isProfile,
   isProfileDocument,
-  isProfileSnapshot,
-  isUrlReplacement,
+  isProfileState,
 } from "../domain/profile-validation";
 
-export const PROFILE_COMMAND_CHANNEL = "profile-store-command-v2" as const;
+export const PROFILE_COMMAND_CHANNEL = "profile-store-command" as const;
 
 export interface ProfileCommandMessage {
   channel: typeof PROFILE_COMMAND_CHANNEL;
@@ -34,40 +35,38 @@ export type ProfileCommandResponse =
   | { ok: false; error: string };
 
 function isProfileMetadataPatch(value: unknown): boolean {
-  if (
-    !isRecord(value) ||
-    !hasOnlyKeys(value, ["title", "backgroundColor", "enabled", "paused", "hideComment"])
-  ) {
+  if (!isRecord(value) || !hasOnlyKeys(value, ["title", "backgroundColor", "enabled", "paused"])) {
     return false;
   }
   return (
     (value.title === undefined || typeof value.title === "string") &&
-    (value.backgroundColor === undefined ||
-      (typeof value.backgroundColor === "string" && value.backgroundColor.length > 0)) &&
+    (value.backgroundColor === undefined || isProfileBackgroundColor(value.backgroundColor)) &&
     (value.enabled === undefined || typeof value.enabled === "boolean") &&
-    (value.paused === undefined || typeof value.paused === "boolean") &&
-    (value.hideComment === undefined || typeof value.hideComment === "boolean")
+    (value.paused === undefined || typeof value.paused === "boolean")
   );
 }
 
 function isProfileRule(collection: ProfileRuleCollection, value: unknown): boolean {
-  if (collection === "csp") return isHeaderRule(value) && isCspDirectiveRule(value);
-  if (collection === "headers" || collection === "respHeaders") return isHeaderRule(value);
-  if (collection === "cookies") return isCookieRule(value);
-  return isUrlReplacement(value);
+  if (collection === "requestHeaders" || collection === "responseHeaders") {
+    return isHeaderRule(value);
+  }
+  if (collection === "csp") return isCspRule(value);
+  return isNameValueRule(value);
 }
 
 function isProfileRulePatch(collection: ProfileRuleCollection, value: unknown): boolean {
   if (!isRecord(value)) return false;
   if (collection === "csp") {
     return (
-      hasOnlyKeys(value, ["enabled", "value", "comment"]) &&
+      hasOnlyKeys(value, ["enabled", "directive", "value", "comment"]) &&
       (value.enabled === undefined || typeof value.enabled === "boolean") &&
+      (value.directive === undefined || typeof value.directive === "string") &&
       (value.value === undefined || typeof value.value === "string") &&
       (value.comment === undefined || typeof value.comment === "string")
     );
   }
-  const headerCollection = collection === "headers" || collection === "respHeaders";
+
+  const headerCollection = collection === "requestHeaders" || collection === "responseHeaders";
   const allowedKeys = headerCollection
     ? ["enabled", "name", "value", "comment", "appendMode", "sendEmptyHeader"]
     : ["enabled", "name", "value", "comment"];
@@ -106,35 +105,50 @@ function isProfileCommand(value: unknown): value is ProfileCommand {
 
   switch (value.type) {
     case "initialize":
-      return isProfile(value.profile);
+      return hasOnlyKeys(value, ["type", "profile"]) && isProfile(value.profile);
     case "selectProfile":
     case "sortProfileRules":
-      return isNonEmptyString(value.profileId);
+      return hasOnlyKeys(value, ["type", "profileId"]) && isNonEmptyString(value.profileId);
     case "patchProfile":
-      return isNonEmptyString(value.profileId) && isProfileMetadataPatch(value.patch);
+      return (
+        hasOnlyKeys(value, ["type", "profileId", "patch"]) &&
+        isNonEmptyString(value.profileId) &&
+        isProfileMetadataPatch(value.patch)
+      );
     case "reorderProfiles":
-      return isNonEmptyString(value.sourceProfileId) && isNonEmptyString(value.targetProfileId);
+      return (
+        hasOnlyKeys(value, ["type", "sourceProfileId", "targetProfileId"]) &&
+        isNonEmptyString(value.sourceProfileId) &&
+        isNonEmptyString(value.targetProfileId)
+      );
     case "addProfile":
-      return isProfile(value.profile);
+      return hasOnlyKeys(value, ["type", "profile"]) && isProfile(value.profile);
     case "cloneProfile":
       return (
+        hasOnlyKeys(value, ["type", "sourceProfileId", "cloneId", "title", "backgroundColor"]) &&
         isNonEmptyString(value.sourceProfileId) &&
         isNonEmptyString(value.cloneId) &&
         typeof value.title === "string" &&
-        isNonEmptyString(value.backgroundColor)
+        isProfileBackgroundColor(value.backgroundColor)
       );
     case "deleteProfile":
-      return isNonEmptyString(value.profileId) && isProfile(value.replacement);
+      return (
+        hasOnlyKeys(value, ["type", "profileId", "replacement"]) &&
+        isNonEmptyString(value.profileId) &&
+        isProfile(value.replacement)
+      );
     case "importProfiles":
-      return isArrayOf(value.profiles, isProfile);
+      return hasOnlyKeys(value, ["type", "profiles"]) && isArrayOf(value.profiles, isProfile);
     case "addRule":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "collection", "rule"]) &&
         isNonEmptyString(value.profileId) &&
         isProfileRuleCollection(value.collection) &&
         isProfileRule(value.collection, value.rule)
       );
     case "patchRule":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "collection", "ruleId", "patch"]) &&
         isNonEmptyString(value.profileId) &&
         isProfileRuleCollection(value.collection) &&
         isNonEmptyString(value.ruleId) &&
@@ -142,12 +156,14 @@ function isProfileCommand(value: unknown): value is ProfileCommand {
       );
     case "deleteRule":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "collection", "ruleId"]) &&
         isNonEmptyString(value.profileId) &&
         isProfileRuleCollection(value.collection) &&
         isNonEmptyString(value.ruleId)
       );
     case "cloneRule":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "collection", "ruleId", "cloneId"]) &&
         isNonEmptyString(value.profileId) &&
         isProfileRuleCollection(value.collection) &&
         isNonEmptyString(value.ruleId) &&
@@ -155,26 +171,34 @@ function isProfileCommand(value: unknown): value is ProfileCommand {
       );
     case "setRulesEnabled":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "collection", "enabled"]) &&
         isNonEmptyString(value.profileId) &&
         isProfileRuleCollection(value.collection) &&
         typeof value.enabled === "boolean"
       );
     case "clearRules":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "collection", "expectedRevision"]) &&
         isNonEmptyString(value.profileId) &&
         isProfileRuleCollection(value.collection) &&
         isNonNegativeInteger(value.expectedRevision)
       );
     case "convertHeader":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "ruleId", "target"]) &&
         isNonEmptyString(value.profileId) &&
         isNonEmptyString(value.ruleId) &&
-        (value.target === "headers" || value.target === "respHeaders")
+        (value.target === "requestHeaders" || value.target === "responseHeaders")
       );
     case "addFilter":
-      return isNonEmptyString(value.profileId) && isProfileFilter(value.filter);
+      return (
+        hasOnlyKeys(value, ["type", "profileId", "filter"]) &&
+        isNonEmptyString(value.profileId) &&
+        isProfileFilter(value.filter)
+      );
     case "patchFilter":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "filterId", "expectedKind", "patch"]) &&
         isNonEmptyString(value.profileId) &&
         isNonEmptyString(value.filterId) &&
         isFilterKind(value.expectedKind) &&
@@ -182,25 +206,43 @@ function isProfileCommand(value: unknown): value is ProfileCommand {
       );
     case "changeFilterKind":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "filterId", "kind", "currentTabId"]) &&
         isNonEmptyString(value.profileId) &&
         isNonEmptyString(value.filterId) &&
         isFilterKind(value.kind) &&
         (value.currentTabId === undefined || isNonNegativeInteger(value.currentTabId))
       );
     case "deleteFilter":
-      return isNonEmptyString(value.profileId) && isNonEmptyString(value.filterId);
+      return (
+        hasOnlyKeys(value, ["type", "profileId", "filterId"]) &&
+        isNonEmptyString(value.profileId) &&
+        isNonEmptyString(value.filterId)
+      );
     case "reorderFilters":
       return (
+        hasOnlyKeys(value, ["type", "profileId", "sourceFilterId", "targetFilterId"]) &&
         isNonEmptyString(value.profileId) &&
         isNonEmptyString(value.sourceFilterId) &&
         isNonEmptyString(value.targetFilterId)
       );
     case "setFiltersEnabled":
-      return isNonEmptyString(value.profileId) && typeof value.enabled === "boolean";
+      return (
+        hasOnlyKeys(value, ["type", "profileId", "enabled"]) &&
+        isNonEmptyString(value.profileId) &&
+        typeof value.enabled === "boolean"
+      );
     case "clearFilters":
-      return isNonEmptyString(value.profileId) && isNonNegativeInteger(value.expectedRevision);
-    case "replaceSnapshot":
-      return isProfileSnapshot(value.snapshot) && isNonNegativeInteger(value.expectedRevision);
+      return (
+        hasOnlyKeys(value, ["type", "profileId", "expectedRevision"]) &&
+        isNonEmptyString(value.profileId) &&
+        isNonNegativeInteger(value.expectedRevision)
+      );
+    case "replaceState":
+      return (
+        hasOnlyKeys(value, ["type", "state", "expectedRevision"]) &&
+        isProfileState(value.state) &&
+        isNonNegativeInteger(value.expectedRevision)
+      );
     default:
       return false;
   }
@@ -209,14 +251,21 @@ function isProfileCommand(value: unknown): value is ProfileCommand {
 export function isProfileCommandMessage(value: unknown): value is ProfileCommandMessage {
   return (
     isRecord(value) &&
+    hasExactKeys(value, ["channel", "clientId", "command"]) &&
     value.channel === PROFILE_COMMAND_CHANNEL &&
     isNonEmptyString(value.clientId) &&
     isProfileCommand(value.command)
   );
 }
 
-export function isProfileCommandResponse(value: unknown): value is ProfileCommandResponse {
-  if (!isRecord(value) || typeof value.ok !== "boolean") return false;
-  if (value.ok) return isProfileDocument(value.document);
-  return typeof value.error === "string";
+export function parseProfileCommandResponse(value: unknown): ProfileCommandResponse | null {
+  if (!isRecord(value) || typeof value.ok !== "boolean") return null;
+  if (value.ok) {
+    return hasExactKeys(value, ["ok", "document"]) && isProfileDocument(value.document)
+      ? { ok: true, document: value.document }
+      : null;
+  }
+  return hasExactKeys(value, ["ok", "error"]) && typeof value.error === "string"
+    ? { ok: false, error: value.error }
+    : null;
 }
