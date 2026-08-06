@@ -15,7 +15,11 @@
     "english": "English",
     "language": "Language",
     "close": "Close",
-    "noSearchResults": "No matching results"
+    "noSearchResults": "No matching results",
+    "comment": "Modification comment",
+    "commentPlaceholder": "Add a comment describing this modification…",
+    "addComment": "Add comment",
+    "removeComment": "Remove comment"
   },
   "profile": {
     "label": "Profile",

@@ -92,7 +92,7 @@ export function FilterSection({
 
   const handleAddButton = () => {
     if (compact) {
-      handleAdd("urlPattern");
+      handleAdd("tab");
       return;
     }
     setOpen(true);

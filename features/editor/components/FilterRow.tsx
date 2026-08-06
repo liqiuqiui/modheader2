@@ -1,8 +1,10 @@
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { clsx } from "clsx";
 import { useSortable } from "@dnd-kit/react/sortable";
-import { GripVertical, X } from "lucide-react";
-import { memo, useMemo } from "react";
+import { GripVertical, MessageSquarePlus, MessageSquareX, MoreHorizontal, X } from "lucide-react";
+import { memo, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Input } from "../../../components/ui/input";
 import { Switch } from "../../../components/ui/switch";
 import {
   FILTER_KINDS,
@@ -15,7 +17,7 @@ import type { BrowserTab } from "../../../types/browser";
 import { FILTER_LABEL_KEYS } from "../constants";
 import { FilterSelect } from "./FilterSelect";
 import { FilterValueEditor } from "./FilterValueEditor";
-import { filterSelectTextClass } from "./styles";
+import { filterSelectTextClass, menuItemClass } from "./styles";
 
 function FilterRowComponent({
   filter,
@@ -42,6 +44,9 @@ function FilterRowComponent({
 }) {
   const { t, i18n } = useTranslation();
   const isEnglish = i18n.resolvedLanguage === "en";
+  const [showComment, setShowComment] = useState(Boolean(filter.comment));
+  const commentRef = useRef<HTMLInputElement>(null);
+  const commentVisible = showComment || Boolean(filter.comment);
   const modeOptions = useMemo(
     () =>
       FILTER_MODES.map((mode) => ({
@@ -116,7 +121,62 @@ function FilterRowComponent({
         >
           <X aria-hidden="true" className="h-4 w-4" />
         </button>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button
+              type="button"
+              aria-label={t("common.more")}
+              className="mt-0.5 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            >
+              <MoreHorizontal aria-hidden="true" className="h-4 w-4" />
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="end"
+              sideOffset={6}
+              className="z-[100] min-w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
+            >
+              <DropdownMenu.Group>
+                <DropdownMenu.Item
+                  className={menuItemClass}
+                  onSelect={() => {
+                    if (commentVisible) {
+                      setShowComment(false);
+                      onPatch(filter.id, filter.kind, { comment: "" });
+                      return;
+                    }
+                    setShowComment(true);
+                    window.setTimeout(() => commentRef.current?.focus(), 0);
+                  }}
+                >
+                  {commentVisible ? (
+                    <MessageSquareX aria-hidden="true" className="h-3.5 w-3.5" />
+                  ) : (
+                    <MessageSquarePlus aria-hidden="true" className="h-3.5 w-3.5" />
+                  )}
+                  {t(commentVisible ? "common.removeComment" : "common.addComment")}
+                </DropdownMenu.Item>
+              </DropdownMenu.Group>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
+      {commentVisible && (
+        <div className="mt-2 pl-0 sm:pl-10">
+          <Input
+            ref={commentRef}
+            aria-label={t("common.comment")}
+            className="h-8 border-dashed border-slate-200 bg-transparent text-xs font-normal text-slate-500 shadow-none"
+            placeholder={t("common.commentPlaceholder")}
+            value={filter.comment}
+            onChange={(event) => {
+              setShowComment(true);
+              onPatch(filter.id, filter.kind, { comment: event.target.value });
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

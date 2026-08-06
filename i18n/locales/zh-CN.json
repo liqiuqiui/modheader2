@@ -15,7 +15,11 @@
     "english": "English",
     "language": "语言",
     "close": "关闭",
-    "noSearchResults": "没有匹配搜索条件的内容"
+    "noSearchResults": "没有匹配搜索条件的内容",
+    "comment": "修改注释",
+    "commentPlaceholder": "添加注释，说明这项修改的用途…",
+    "addComment": "添加注释",
+    "removeComment": "移除注释"
   },
   "profile": {
     "label": "配置",

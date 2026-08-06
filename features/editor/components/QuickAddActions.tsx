@@ -9,6 +9,7 @@ import {
 } from "../../../modules/profile/domain/profile-factory";
 import { createProfileFilter } from "../../../modules/profile/domain/profile-filter";
 import { useProfileStore } from "../../../modules/profile/state/profile-store";
+import { browserTabsStore } from "../stores/browser-tabs-store";
 import { useEditorUiStore } from "../stores/editor-ui-store";
 import { menuItemClass } from "./styles";
 
@@ -92,7 +93,11 @@ export function QuickAddActions() {
       <button
         type="button"
         onClick={() => {
-          const nextFilter = createProfileFilter({ kind: "urlPattern", mode: "include" });
+          const nextFilter = createProfileFilter({
+            kind: "tab",
+            mode: "include",
+            currentTabId: browserTabsStore.getState().currentTabId,
+          });
           requestFocus("filter", nextFilter.id);
           void addFilter(profileId, nextFilter);
         }}
