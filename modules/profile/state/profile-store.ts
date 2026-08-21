@@ -40,6 +40,7 @@ export interface ProfileStoreState extends ProfileState {
   status: ProfileStoreStatus;
   revision: number;
   sourceId: string;
+  isPaused: boolean;
   error: string | null;
   past: ProfileState[];
   future: ProfileState[];
@@ -147,7 +148,12 @@ function profileStateOf(state: ProfileState): ProfileState {
 }
 
 function documentOf(state: ProfileStoreState): ProfileDocument {
-  return createProfileDocument(profileStateOf(state), state.sourceId, state.revision);
+  return createProfileDocument(
+    profileStateOf(state),
+    state.sourceId,
+    state.revision,
+    state.isPaused,
+  );
 }
 
 function errorMessage(error: unknown): string {
@@ -195,6 +201,7 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
       status: "ready",
       revision: document.revision,
       sourceId: document.sourceId,
+      isPaused: document.isPaused ?? false,
       profiles: profileState.profiles,
       selectedProfileId: profileState.selectedProfileId,
       error: options.error ?? null,
@@ -282,6 +289,7 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
     set({
       revision: next.revision,
       sourceId: next.sourceId,
+      isPaused: next.isPaused ?? false,
       profiles: nextProfileState.profiles,
       selectedProfileId: nextProfileState.selectedProfileId,
       error: null,
@@ -333,6 +341,7 @@ export const profileStore = createStore<ProfileStoreState>()((set, get) => {
     status: "idle",
     revision: 0,
     sourceId: PROFILE_COMMAND_CLIENT_ID,
+    isPaused: false,
     error: null,
     profiles: [],
     selectedProfileId: null,

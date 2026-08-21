@@ -12,18 +12,22 @@ export interface ProfileDocument {
   revision: number;
   sourceId: string;
   state: ProfileState;
+  /** Canonical global pause state. */
+  isPaused?: boolean;
 }
 
 export function createProfileDocument(
   state: ProfileState,
   sourceId: string,
   revision: number,
+  isPaused = false,
 ): ProfileDocument {
   return {
     schemaVersion: PROFILE_DOCUMENT_SCHEMA_VERSION,
     revision,
     sourceId,
     state,
+    isPaused,
   };
 }
 
@@ -35,6 +39,7 @@ export function createInitialProfileDocument(
   profile: Profile,
   sourceId: string,
   revision: number,
+  isPaused = false,
 ): ProfileDocument {
   return createProfileDocument(
     {
@@ -43,6 +48,7 @@ export function createInitialProfileDocument(
     },
     sourceId,
     revision,
+    isPaused,
   );
 }
 

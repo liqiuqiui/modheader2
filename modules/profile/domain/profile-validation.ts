@@ -5,6 +5,7 @@ import { PROFILE_DOCUMENT_SCHEMA_VERSION } from "./profile-document";
 import { isProfileFilter } from "./profile-filter";
 import {
   hasExactKeys,
+  hasOnlyKeys,
   isAppendMode,
   isArrayOf,
   isNonEmptyString,
@@ -76,23 +77,77 @@ export function isProfileRules(value: unknown): value is ProfileRules {
 export function isProfile(value: unknown): value is Profile {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, [
+    !hasOnlyKeys(value, [
       "id",
+      "version",
       "title",
+      "shortTitle",
       "backgroundColor",
+      "textColor",
+      "hideComment",
       "enabled",
       "paused",
       "rules",
       "filters",
+      "headers",
+      "respHeaders",
+      "cookieHeaders",
+      "setCookieHeaders",
+      "cspHeaders",
+      "urlReplacements",
+      "urlFilters",
+      "excludeUrlFilters",
+      "initiatorDomainFilters",
+      "excludeRequestDomainFilters",
+      "resourceFilters",
+      "tabFilters",
+      "tabGroupFilters",
+      "windowFilters",
+      "timeFilters",
+      "requestMethodFilters",
+      "reqCookieAppend",
+      "alwaysOn",
+      "profileId",
+      "liveProfileUrl",
+      "liveProfileStatus",
+      "liveProfileLastSyncTimestamp",
+      "liveProfileIsOwner",
     ]) ||
     !isNonEmptyString(value.id) ||
     typeof value.title !== "string" ||
+    (value.version !== undefined && value.version !== 2) ||
+    (value.shortTitle !== undefined && typeof value.shortTitle !== "string") ||
     !isProfileBackgroundColor(value.backgroundColor) ||
+    (value.textColor !== undefined && typeof value.textColor !== "string") ||
+    (value.hideComment !== undefined && typeof value.hideComment !== "boolean") ||
     typeof value.enabled !== "boolean" ||
     typeof value.paused !== "boolean" ||
     !isProfileRules(value.rules) ||
     !isArrayOf(value.filters, isProfileFilter)
   ) {
+    return false;
+  }
+
+  const canonicalArrays = [
+    "headers",
+    "respHeaders",
+    "cookieHeaders",
+    "setCookieHeaders",
+    "cspHeaders",
+    "urlReplacements",
+    "urlFilters",
+    "excludeUrlFilters",
+    "initiatorDomainFilters",
+    "excludeRequestDomainFilters",
+    "resourceFilters",
+    "tabFilters",
+    "tabGroupFilters",
+    "windowFilters",
+    "timeFilters",
+    "requestMethodFilters",
+    "reqCookieAppend",
+  ] as const;
+  if (canonicalArrays.some((key) => value[key] !== undefined && !Array.isArray(value[key]))) {
     return false;
   }
 
@@ -120,10 +175,11 @@ export function isProfileState(value: unknown): value is ProfileState {
 export function isProfileDocument(value: unknown): value is ProfileDocument {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ["schemaVersion", "revision", "sourceId", "state"]) &&
+    hasOnlyKeys(value, ["schemaVersion", "revision", "sourceId", "state", "isPaused"]) &&
     value.schemaVersion === PROFILE_DOCUMENT_SCHEMA_VERSION &&
     isNonNegativeInteger(value.revision) &&
     typeof value.sourceId === "string" &&
+    (value.isPaused === undefined || typeof value.isPaused === "boolean") &&
     isProfileState(value.state)
   );
 }

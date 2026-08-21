@@ -4,16 +4,17 @@ import {
   createInitialProfileDocument,
 } from "../../domain/profile-document";
 import { createProfile } from "../../domain/profile-factory";
+import { toPersistedState } from "../../domain/profile-persistence";
 
 const storageMocks = vi.hoisted(() => {
-  const getValue = vi.fn();
-  const setValue = vi.fn();
-  const watch = vi.fn((_callback: (value: unknown) => void) => () => undefined);
+  const state = {
+    getValue: vi.fn(),
+    setValue: vi.fn(),
+    watch: vi.fn((_callback: () => void) => () => undefined),
+  };
   return {
-    getValue,
-    setValue,
-    watch,
-    defineItem: vi.fn(() => ({ getValue, setValue, watch })),
+    state,
+    defineItem: vi.fn(() => state),
   };
 });
 
@@ -30,62 +31,74 @@ import {
 
 describe("profile state storage", () => {
   beforeEach(() => {
-    storageMocks.getValue.mockReset();
-    storageMocks.setValue.mockReset();
-    storageMocks.watch.mockReset();
-    storageMocks.getValue.mockResolvedValue(null);
-    storageMocks.setValue.mockResolvedValue(undefined);
-    storageMocks.watch.mockReturnValue(() => undefined);
+    storageMocks.state.getValue.mockReset();
+    storageMocks.state.setValue.mockReset();
+    storageMocks.state.watch.mockReset();
+    storageMocks.state.setValue.mockResolvedValue(undefined);
+    storageMocks.state.watch.mockReturnValue(() => undefined);
+    storageMocks.state.getValue.mockResolvedValue({
+      state: { profiles: [], selectedProfile: 0, isPaused: false },
+      revision: 0,
+      sourceId: "",
+    });
   });
 
-  it("uses the new profile-state key and an empty schema 1 default", () => {
+  it("stores canonical state and command metadata atomically in one storage item", () => {
     expect(PROFILE_STATE_STORAGE_KEY).toBe("local:profile-state");
     expect(storageMocks.defineItem).toHaveBeenCalledWith("local:profile-state", {
-      defaultValue: createEmptyProfileDocument(),
+      defaultValue: {
+        state: { profiles: [], selectedProfile: 0, isPaused: false },
+        revision: 0,
+        sourceId: "",
+      },
     });
   });
 
-  it("reads and writes a valid document unchanged", async () => {
-    const document = createInitialProfileDocument(
-      createProfile({
-        id: "profile-1",
-        title: "Current",
-        backgroundColor: "#2563eb",
-      }),
-      "client-a",
-      4,
-    );
-    storageMocks.getValue.mockResolvedValue(document);
+  it("round-trips canonical state with revision metadata", async () => {
+    const profile = createProfile({
+      id: "profile-1",
+      title: "Current",
+      backgroundColor: "#2563eb",
+    });
+    const document = createInitialProfileDocument(profile, "client-a", 4);
+    const persisted = {
+      state: toPersistedState([profile], 0, false),
+      revision: 4,
+      sourceId: "client-a",
+    };
+    storageMocks.state.getValue.mockResolvedValue(persisted);
 
-    await expect(readStoredProfileDocument()).resolves.toBe(document);
+    await expect(readStoredProfileDocument()).resolves.toMatchObject({
+      schemaVersion: 1,
+      revision: 4,
+      sourceId: "client-a",
+      isPaused: false,
+      state: {
+        selectedProfileId: "profile-1",
+        profiles: [{ id: "profile-1", title: "Current" }],
+      },
+    });
     await expect(writeStoredProfileDocument(document)).resolves.toBeUndefined();
-    expect(storageMocks.setValue).toHaveBeenCalledWith(document);
+    expect(storageMocks.state.setValue).toHaveBeenCalledWith(persisted);
   });
 
-  it("treats invalid and old-schema values as an empty document", async () => {
-    storageMocks.getValue.mockResolvedValue({
-      schemaVersion: 2,
-      revision: 9,
-      sourceId: "legacy",
-      state: { profiles: [], selectedProfileId: null },
-    });
+  it("treats invalid canonical state as an empty document", async () => {
+    storageMocks.state.getValue.mockResolvedValue({ schemaVersion: 1 });
 
     await expect(readStoredProfileDocument()).resolves.toEqual(createEmptyProfileDocument());
-    expect(storageMocks.setValue).not.toHaveBeenCalled();
   });
 
-  it("normalizes invalid watched values to the same empty document", () => {
-    let listener: ((value: unknown) => void) | undefined;
-    storageMocks.watch.mockImplementation((callback: (value: unknown) => void) => {
+  it("re-reads the document when storage changes", async () => {
+    let listener: (() => void) | undefined;
+    storageMocks.state.watch.mockImplementation((callback: () => void) => {
       listener = callback;
       return () => undefined;
     });
     const callback = vi.fn();
     watchStoredProfileDocument(callback);
 
-    listener?.({ schemaVersion: 99 });
-
-    expect(callback).toHaveBeenCalledWith(createEmptyProfileDocument());
+    listener?.();
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
   });
 
   it("refuses to persist an invalid document", async () => {
@@ -97,6 +110,6 @@ describe("profile state storage", () => {
     await expect(writeStoredProfileDocument(invalid as never)).rejects.toThrow(
       "Refusing to persist an invalid profile document",
     );
-    expect(storageMocks.setValue).not.toHaveBeenCalled();
+    expect(storageMocks.state.setValue).not.toHaveBeenCalled();
   });
 });

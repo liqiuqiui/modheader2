@@ -53,7 +53,7 @@ function nextDocument(
   state: ProfileState,
   sourceId: string,
 ): ProfileDocument {
-  return createProfileDocument(state, sourceId, current.revision + 1);
+  return createProfileDocument(state, sourceId, current.revision + 1, current.isPaused);
 }
 
 function replaceProfile(
@@ -85,7 +85,12 @@ function reduceProfileCommandDocument(
 
   if (command.type === "initialize") {
     if (state.profiles.length > 0 || !isProfile(command.profile)) return current;
-    return createInitialProfileDocument(command.profile, sourceId, current.revision + 1);
+    return createInitialProfileDocument(
+      command.profile,
+      sourceId,
+      current.revision + 1,
+      current.isPaused,
+    );
   }
 
   if (command.type === "selectProfile") {
@@ -148,7 +153,7 @@ function reduceProfileCommandDocument(
       return current;
     }
     const clone = applyProfileMetadataPatch(
-      { ...structuredClone(original), id: command.cloneId },
+      { ...structuredClone(original), id: command.cloneId, profileId: command.cloneId },
       { title: command.title, backgroundColor: command.backgroundColor },
     );
     if (!isProfile(clone)) return current;
@@ -182,11 +187,13 @@ function reduceProfileCommandDocument(
   if (command.type === "importProfiles") {
     if (!Array.isArray(command.profiles) || command.profiles.length === 0) return current;
     const ids = new Set(state.profiles.map((profile) => profile.id));
-    const importedProfiles = command.profiles.filter((profile) => {
-      if (!isProfile(profile) || ids.has(profile.id)) return false;
-      ids.add(profile.id);
-      return true;
-    });
+    const importedProfiles = command.profiles
+      .filter((profile) => {
+        if (!isProfile(profile) || ids.has(profile.id)) return false;
+        ids.add(profile.id);
+        return true;
+      })
+      .map((profile) => ({ ...profile, profileId: profile.id }));
     if (importedProfiles.length === 0) return current;
     return nextDocument(
       current,
