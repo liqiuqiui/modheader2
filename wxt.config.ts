@@ -3,6 +3,9 @@ import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
+  alias: {
+    "@": path.resolve(__dirname, "src"),
+  },
   modules: ["@wxt-dev/module-react"],
   dev: {
     server: {
@@ -15,11 +18,6 @@ export default defineConfig({
   },
   vite: () => ({
     plugins: [tailwindcss()],
-    resolve: {
-      alias: {
-        "@": path.resolve(__dirname),
-      },
-    },
   }),
   manifest: {
     default_locale: "zh_CN",

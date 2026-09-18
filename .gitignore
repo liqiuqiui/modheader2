@@ -37,6 +37,7 @@ tmp/
 temp/
 .npm-cache
 docs/research
+docs/plan
 
 # Test and tool artifacts
 playwright-report/

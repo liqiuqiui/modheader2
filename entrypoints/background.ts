@@ -1,32 +1,31 @@
 import { nanoid } from "nanoid";
 import { defineBackground } from "wxt/utils/define-background";
-import i18n, { initializeI18n } from "../i18n";
-import { localeStorage } from "../i18n/locale-storage";
-import type { ProfileCommand } from "../modules/profile/application/profile-command";
+import i18n, { initializeI18n } from "../src/i18n";
+import { localeStorage } from "../src/i18n/locale-storage";
+import type { ProfileCommand } from "../src/services/profile/profile-command";
 import {
   isProfileCommandRevisionConflict,
   reduceProfileCommand,
-} from "../modules/profile/application/reduce-profile-command";
-import {
-  applyDnrRules,
-  compileProfileDnrRules,
-} from "../modules/profile/infrastructure/profile-dnr";
-import { profileActionBadgeController } from "../modules/profile/infrastructure/profile-action-badge";
+} from "../src/services/profile/reduce-profile-command";
+import { applyDnrRules, compileProfileDnrRules } from "../src/browser/profile/profile-dnr";
+import { profileActionBadgeController } from "../src/browser/profile/profile-action-badge";
 import {
   isProfileCommandMessage,
   type ProfileCommandResponse,
-} from "../modules/profile/infrastructure/profile-command-protocol";
+} from "../src/browser/profile/profile-command-protocol";
 import {
   readStoredProfileDocument,
   type ProfileDocument,
   watchStoredProfileDocument,
   writeStoredProfileDocument,
-} from "../modules/profile/infrastructure/profile-storage";
+} from "../src/browser/profile/profile-storage";
+import {
+  createDocumentMutationQueue,
+  createLatestTask,
+} from "../src/browser/profile/profile-background-queue";
 
 const CONTEXT_MENU_ID = "toggle_pause";
 const BACKGROUND_SOURCE_ID = nanoid();
-
-let documentMutationQueue: Promise<void> = Promise.resolve();
 
 function selectedProfile(document: ProfileDocument) {
   const profileId = document.state.selectedProfileId;
@@ -53,6 +52,7 @@ async function syncRules() {
 }
 
 async function syncContextMenu() {
+  await contextMenuReady;
   await initializeI18n();
   const [locale, document] = await Promise.all([
     localeStorage.getValue(),
@@ -65,43 +65,10 @@ async function syncContextMenu() {
   });
 }
 
-function latestTask(task: () => Promise<void>) {
-  let requested = false;
-  let running = false;
-
-  const run = async () => {
-    if (running) return;
-    running = true;
-    try {
-      while (requested) {
-        requested = false;
-        await task();
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      running = false;
-      if (requested) void run();
-    }
-  };
-
-  return () => {
-    requested = true;
-    void run();
-  };
-}
-
-const scheduleRulesSync = latestTask(syncRules);
-const scheduleContextMenuSync = latestTask(syncContextMenu);
-
-function enqueueDocumentTask<T>(task: () => Promise<T>): Promise<T> {
-  const result = documentMutationQueue.then(task);
-  documentMutationQueue = result.then(
-    () => undefined,
-    () => undefined,
-  );
-  return result;
-}
+const scheduleRulesSync = createLatestTask(syncRules);
+const scheduleContextMenuSync = createLatestTask(syncContextMenu);
+const enqueueDocumentTask = createDocumentMutationQueue();
+let contextMenuReady: Promise<void> = Promise.resolve();
 
 function executeProfileCommand(
   command: ProfileCommand,
@@ -141,7 +108,7 @@ async function createContextMenu() {
   const locale = await localeStorage.getValue();
   const profile = selectedProfile(await readStoredProfileDocument());
   const t = i18n.getFixedT(locale);
-  browser.contextMenus.create({
+  await browser.contextMenus.create({
     id: CONTEXT_MENU_ID,
     title: t(profile?.paused ? "context.resume" : "context.pause"),
     contexts: ["action"],
@@ -150,7 +117,8 @@ async function createContextMenu() {
 
 export default defineBackground(() => {
   scheduleRulesSync();
-  void createContextMenu().then(scheduleContextMenuSync).catch(console.error);
+  contextMenuReady = createContextMenu();
+  void contextMenuReady.then(scheduleContextMenuSync).catch(console.error);
 
   watchStoredProfileDocument(() => {
     scheduleRulesSync();
