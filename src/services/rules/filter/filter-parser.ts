@@ -36,10 +36,13 @@ export function isFilterMode(value: unknown): value is FilterMode {
 }
 
 export function isFilterValue(kind: FilterKind, value: unknown): value is ProfileFilter["value"] {
-  if (kind === "tab")
+  if (kind === "tab" || kind === "tabGroup" || kind === "window")
     return value === null || (typeof value === "number" && Number.isInteger(value) && value >= 0);
   if (kind === "resourceType") return isResourceType(value);
   if (kind === "method") return isRequestMethod(value);
+  if (kind === "time") {
+    return typeof value === "number" && Number.isInteger(value) && value >= 0;
+  }
   return typeof value === "string";
 }
 
@@ -78,7 +81,7 @@ export function createFilter<K extends FilterKind>({
   id?: string;
 }): ProfileFilterByKind<K> {
   const common = { id, enabled: true, mode, comment: "" };
-  if (kind === "tab") {
+  if (kind === "tab" || kind === "tabGroup" || kind === "window") {
     const value =
       typeof currentTabId === "number" && Number.isInteger(currentTabId) && currentTabId >= 0
         ? currentTabId
@@ -88,5 +91,8 @@ export function createFilter<K extends FilterKind>({
   if (kind === "resourceType")
     return { ...common, kind, value: "xmlhttprequest" } as ProfileFilterByKind<K>;
   if (kind === "method") return { ...common, kind, value: "get" } as ProfileFilterByKind<K>;
+  if (kind === "time") {
+    return { ...common, kind, value: Date.now() + 60 * 60 * 1000 } as ProfileFilterByKind<K>;
+  }
   return { ...common, kind, value: "" } as ProfileFilterByKind<K>;
 }

@@ -7,7 +7,11 @@ import {
   isProfileCommandRevisionConflict,
   reduceProfileCommand,
 } from "../src/services/profile/reduce-profile-command";
-import { applyDnrRules, compileProfileDnrRules } from "../src/browser/profile/profile-dnr";
+import {
+  applyDnrRules,
+  compileProfileDnrRules,
+  nextProfileTimeFilterExpiration,
+} from "../src/browser/profile/profile-dnr";
 import { profileActionBadgeController } from "../src/browser/profile/profile-action-badge";
 import {
   isProfileCommandMessage,
@@ -25,6 +29,7 @@ import {
 } from "../src/browser/profile/profile-background-queue";
 
 const CONTEXT_MENU_ID = "toggle_pause";
+const TIME_FILTER_ALARM = "checkTimeFilterAlarm";
 const BACKGROUND_SOURCE_ID = nanoid();
 
 function selectedProfile(document: ProfileDocument) {
@@ -36,7 +41,8 @@ function selectedProfile(document: ProfileDocument) {
 
 async function syncRules() {
   const profile = selectedProfile(await readStoredProfileDocument());
-  const compilation = compileProfileDnrRules(profile);
+  const tabs = await browser.tabs.query({});
+  const compilation = compileProfileDnrRules(profile, { tabs });
   if (compilation.diagnostics.length > 0) {
     console.warn(
       `Profile DNR compilation failed for ${profile?.id ?? "no selected profile"}: ${compilation.diagnostics.join("; ")}`,
@@ -49,6 +55,11 @@ async function syncRules() {
     throw error;
   }
   await profileActionBadgeController.sync(profile, compilation.rules);
+  await browser.alarms.clear(TIME_FILTER_ALARM);
+  const expiration = nextProfileTimeFilterExpiration(profile);
+  if (expiration !== null) {
+    await browser.alarms.create(TIME_FILTER_ALARM, { when: expiration });
+  }
 }
 
 async function syncContextMenu() {
@@ -139,6 +150,10 @@ export default defineBackground(() => {
     { urls: ["<all_urls>"] },
   );
 
+  // A new tab can join an existing group, which changes the tab ids that
+  // tab-group and window filters resolve to.
+  browser.tabs.onCreated.addListener(() => scheduleRulesSync());
+
   browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.url) {
       void profileActionBadgeController.observeTabUrl(tabId, changeInfo.url).catch(console.error);
@@ -149,7 +164,13 @@ export default defineBackground(() => {
     if (changeInfo.status === "complete") {
       void profileActionBadgeController.observeTabComplete(tabId).catch(console.error);
     }
+    if (changeInfo.groupId !== undefined) {
+      scheduleRulesSync();
+    }
   });
+
+  browser.tabs.onAttached.addListener(() => scheduleRulesSync());
+  browser.tabs.onDetached.addListener(() => scheduleRulesSync());
 
   browser.tabs.onActivated.addListener(({ tabId }) => {
     void profileActionBadgeController.observeTabActivated(tabId).catch(console.error);
@@ -157,6 +178,7 @@ export default defineBackground(() => {
 
   browser.tabs.onRemoved.addListener((tabId) => {
     void profileActionBadgeController.forgetTab(tabId).catch(console.error);
+    scheduleRulesSync();
   });
 
   browser.contextMenus.onClicked.addListener((info) => {
@@ -174,5 +196,9 @@ export default defineBackground(() => {
       );
       if (result.status === "applied") await writeStoredProfileDocument(result.document);
     }).catch(console.error);
+  });
+
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === TIME_FILTER_ALARM) scheduleRulesSync();
   });
 });

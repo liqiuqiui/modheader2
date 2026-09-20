@@ -70,6 +70,14 @@ function hostnameFromInitiator(initiator?: string): string | null {
   }
 }
 
+function hostnameFromUrl(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
 function hostnameMatchesDomain(hostname: string, domain: string): boolean {
   const normalizedDomain = domain.toLowerCase();
   return hostname === normalizedDomain || hostname.endsWith(`.${normalizedDomain}`);
@@ -110,6 +118,14 @@ function createConditionMatcher(rule: ProfileDnrRule): ProfileRequestMatcher {
       return false;
     }
     if (matchesAnyDomain(initiatorHostname, condition.excludedInitiatorDomains)) return false;
+    const requestHostname = hostnameFromUrl(request.url);
+    if (
+      condition.requestDomains?.length &&
+      !matchesAnyDomain(requestHostname, condition.requestDomains)
+    ) {
+      return false;
+    }
+    if (matchesAnyDomain(requestHostname, condition.excludedRequestDomains)) return false;
 
     return true;
   };

@@ -128,18 +128,26 @@ export type FilterKind =
   | "urlPattern"
   | "urlRegex"
   | "tab"
+  | "tabGroup"
+  | "window"
   | "resourceType"
   | "method"
-  | "initiator";
+  | "initiator"
+  | "requestDomain"
+  | "time";
 export type FilterMode = "include" | "exclude";
 
 export const FILTER_KINDS: readonly FilterKind[] = [
   "urlPattern",
   "urlRegex",
   "tab",
+  "tabGroup",
+  "window",
   "resourceType",
   "method",
   "initiator",
+  "requestDomain",
+  "time",
 ];
 export const FILTER_MODES: readonly FilterMode[] = ["include", "exclude"];
 
@@ -158,9 +166,13 @@ export type ProfileFilter =
   | BaseProfileFilter<"urlPattern", string>
   | BaseProfileFilter<"urlRegex", string>
   | BaseProfileFilter<"tab", number | null>
+  | BaseProfileFilter<"tabGroup", number | null>
+  | BaseProfileFilter<"window", number | null>
   | BaseProfileFilter<"resourceType", ResourceType>
   | BaseProfileFilter<"method", RequestMethod>
-  | BaseProfileFilter<"initiator", string>;
+  | BaseProfileFilter<"initiator", string>
+  | BaseProfileFilter<"requestDomain", string>
+  | BaseProfileFilter<"time", number>;
 
 export type ProfileFilterByKind<K extends FilterKind> = Extract<ProfileFilter, { kind: K }>;
 export type ProfileFilterPatch = Partial<

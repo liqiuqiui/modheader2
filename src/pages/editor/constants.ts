@@ -11,9 +11,13 @@ export const FILTER_LABEL_KEYS: Record<FilterKind, ParseKeys> = {
   urlPattern: "filter.urlPattern",
   urlRegex: "filter.urlRegex",
   tab: "filter.tab",
+  tabGroup: "filter.tabGroup",
+  window: "filter.window",
   resourceType: "filter.resourceType",
   method: "filter.method",
   initiator: "filter.initiator",
+  requestDomain: "filter.requestDomain",
+  time: "filter.time",
 };
 
 const RESOURCE_LABEL_KEYS: Record<ResourceType, ParseKeys> = {

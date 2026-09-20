@@ -26,6 +26,25 @@ export function FilterValueEditor({
       <TabPicker value={filter.value} tabs={tabs} currentTabId={currentTabId} onChange={onChange} />
     );
   }
+  if (filter.kind === "tabGroup" || filter.kind === "window") {
+    const values = Array.from(
+      new Set(
+        tabs
+          .map((tab) => (filter.kind === "tabGroup" ? tab.groupId : tab.windowId))
+          .filter((value): value is number => typeof value === "number" && value >= 0),
+      ),
+    );
+    return (
+      <FilterSelect
+        ariaLabel={t(FILTER_LABEL_KEYS[filter.kind])}
+        value={filter.value === null ? "" : String(filter.value)}
+        onValueChange={(value) => onChange(value ? Number(value) : null)}
+        className="min-w-0 flex-1"
+        itemClassName={filterSelectTextClass}
+        options={values.map((value) => ({ value: String(value), label: `#${value}` }))}
+      />
+    );
+  }
   if (filter.kind === "resourceType") {
     return (
       <FilterSelect
@@ -51,13 +70,34 @@ export function FilterValueEditor({
       />
     );
   }
+  if (filter.kind === "time") {
+    const localValue = new Date(filter.value)
+      .toLocaleString("sv-SE")
+      .replace(" ", "T")
+      .slice(0, 16);
+    return (
+      <input
+        aria-label={t("filter.time")}
+        type="datetime-local"
+        value={localValue}
+        min={new Date().toLocaleString("sv-SE").replace(" ", "T").slice(0, 16)}
+        onChange={(event) => {
+          const timestamp = new Date(event.target.value).getTime();
+          if (Number.isFinite(timestamp)) onChange(timestamp);
+        }}
+        className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-[var(--theme-color)]"
+      />
+    );
+  }
 
   const placeholder =
     filter.kind === "initiator"
       ? t("filter.initiatorPlaceholder")
-      : filter.kind === "urlRegex"
-        ? t("filter.regexPlaceholder")
-        : t("filter.patternPlaceholder");
+      : filter.kind === "requestDomain"
+        ? t("filter.requestDomainPlaceholder")
+        : filter.kind === "urlRegex"
+          ? t("filter.regexPlaceholder")
+          : t("filter.patternPlaceholder");
   let invalid = false;
   if (filter.kind === "urlRegex" && String(filter.value)) {
     try {

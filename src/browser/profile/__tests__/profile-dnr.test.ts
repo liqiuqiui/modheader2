@@ -12,8 +12,10 @@ import {
   compileProfileDnrRules,
   countEnabledProfileModifications,
   MAX_PROFILE_DNR_RULES,
+  nextProfileTimeFilterExpiration,
   PROFILE_DNR_RULE_ID_BASE,
   profileToDnrRules,
+  type ProfileDnrCompileOptions,
 } from "../profile-dnr";
 
 function profileWithFilters(filters: ProfileFilter[]): Profile {
@@ -32,8 +34,10 @@ function withRules(profile: Profile, rules: Partial<Profile["rules"]>): Profile 
   return { ...profile, rules: { ...profile.rules, ...rules } };
 }
 
-function modifyHeaderRule(profile: Profile) {
-  return compileProfileDnrRules(profile).rules.find((rule) => rule.action.type === "modifyHeaders");
+function modifyHeaderRule(profile: Profile, options?: ProfileDnrCompileOptions) {
+  return compileProfileDnrRules(profile, options).rules.find(
+    (rule) => rule.action.type === "modifyHeaders",
+  );
 }
 
 const invalidEnabledIncludes: Array<{
@@ -56,6 +60,14 @@ const invalidEnabledIncludes: Array<{
       value: "https://example.com",
     },
     diagnostic: "An enabled initiator filter has an invalid domain",
+  },
+  {
+    label: "invalid request domain",
+    filter: {
+      ...createProfileFilter({ id: "invalid-request-domain", kind: "requestDomain" }),
+      value: "https://example.com",
+    },
+    diagnostic: "An enabled request domain filter has an invalid domain",
   },
 ];
 
@@ -125,6 +137,35 @@ describe("Profile DNR compilation", () => {
     expect(profileToDnrRules({ ...profile, paused: true })).toEqual([]);
   });
 
+  it("does not compile a profile after every enabled time filter has expired", () => {
+    const profile = profileWithFilters([
+      { ...createProfileFilter({ id: "expired", kind: "time" }), value: Date.now() - 1 },
+    ]);
+    expect(compileProfileDnrRules(profile).rules).toEqual([]);
+  });
+
+  it("keeps a profile active while all enabled time filters are in the future", () => {
+    const profile = profileWithFilters([
+      { ...createProfileFilter({ id: "future", kind: "time" }), value: Date.now() + 60_000 },
+    ]);
+    expect(compileProfileDnrRules(profile).rules.length).toBeGreaterThan(0);
+  });
+
+  it("ignores disabled expired time filters and schedules the nearest future expiration", () => {
+    const now = 1_700_000_000_000;
+    const profile = profileWithFilters([
+      {
+        ...createProfileFilter({ id: "disabled-expired", kind: "time" }),
+        enabled: false,
+        value: now - 1,
+      },
+      { ...createProfileFilter({ id: "later", kind: "time" }), value: now + 120_000 },
+      { ...createProfileFilter({ id: "sooner", kind: "time" }), value: now + 60_000 },
+    ]);
+
+    expect(nextProfileTimeFilterExpiration(profile, now)).toBe(now + 60_000);
+  });
+
   it("leaves resource and method conditions open when no such filters exist", () => {
     const rule = modifyHeaderRule(profileWithFilters([]));
 
@@ -151,6 +192,103 @@ describe("Profile DNR compilation", () => {
     expect(rule?.condition.excludedResourceTypes).toEqual(["image"]);
     expect(rule?.condition.requestMethods).toBeUndefined();
     expect(rule?.condition.excludedRequestMethods).toEqual(["post"]);
+  });
+
+  it("compiles request-domain filters separately from initiator filters", () => {
+    const rule = modifyHeaderRule(
+      profileWithFilters([
+        {
+          ...createProfileFilter({ id: "request-domain", kind: "requestDomain" }),
+          value: "api.example.com",
+        },
+        {
+          ...createProfileFilter({
+            id: "exclude-request-domain",
+            kind: "requestDomain",
+            mode: "exclude",
+          }),
+          value: "private.example.com",
+        },
+        {
+          ...createProfileFilter({ id: "initiator", kind: "initiator" }),
+          value: "app.example.com",
+        },
+      ]),
+    );
+    expect(rule?.condition.requestDomains).toEqual(["api.example.com"]);
+    expect(rule?.condition.excludedRequestDomains).toEqual(["private.example.com"]);
+    expect(rule?.condition.initiatorDomains).toEqual(["app.example.com"]);
+  });
+
+  it("trims and lowercases request-domain filters", () => {
+    const rule = modifyHeaderRule(
+      profileWithFilters([
+        {
+          ...createProfileFilter({ id: "mixed-case", kind: "requestDomain" }),
+          value: "  API.Example.COM  ",
+        },
+        {
+          ...createProfileFilter({
+            id: "exclude-mixed-case",
+            kind: "requestDomain",
+            mode: "exclude",
+          }),
+          value: "PRIVATE.Example.com",
+        },
+      ]),
+    );
+    expect(rule?.condition.requestDomains).toEqual(["api.example.com"]);
+    expect(rule?.condition.excludedRequestDomains).toEqual(["private.example.com"]);
+  });
+
+  it("maps tab-group and window filters to matching tab IDs", () => {
+    const profile = profileWithFilters([
+      { ...createProfileFilter({ id: "group", kind: "tabGroup" }), value: 7 },
+      { ...createProfileFilter({ id: "window", kind: "window", mode: "exclude" }), value: 3 },
+    ]);
+    const rule = modifyHeaderRule(profile, {
+      tabs: [
+        { id: 11, groupId: 7, windowId: 1 },
+        { id: 12, groupId: 8, windowId: 3 },
+        { id: 13, groupId: 7, windowId: 3 },
+      ],
+    });
+    expect(rule?.condition.tabIds).toEqual([11, 13]);
+    expect(rule?.condition.excludedTabIds).toEqual([12, 13]);
+  });
+
+  it("fails closed when a tab-group filter has no valid value", () => {
+    const profile = profileWithFilters([
+      { ...createProfileFilter({ id: "group", kind: "tabGroup" }), value: -1 },
+    ]);
+    expect(
+      compileProfileDnrRules(profile, { tabs: [{ id: 11, groupId: 7, windowId: 1 }] }),
+    ).toEqual({
+      rules: [],
+      diagnostics: ["An enabled tab group or window filter has no valid value"],
+    });
+  });
+
+  it("fails closed when tab-group filters have no tab context", () => {
+    const profile = profileWithFilters([
+      { ...createProfileFilter({ id: "group", kind: "tabGroup" }), value: 7 },
+    ]);
+    expect(compileProfileDnrRules(profile)).toEqual({
+      rules: [],
+      diagnostics: ["Tab group and window filters require tab context"],
+    });
+  });
+
+  it("fails closed when tab-group filters match no open tabs", () => {
+    const profile = profileWithFilters([
+      { ...createProfileFilter({ id: "group", kind: "tabGroup" }), value: 7 },
+    ]);
+    expect(
+      compileProfileDnrRules(profile, { tabs: [{ id: 11, groupId: 8, windowId: 1 }] }),
+    ).toEqual({
+      rules: [],
+      diagnostics: ["Tab group or window filters match no open tabs"],
+    });
   });
 
   it("subtracts resource and method excludes from include candidates", () => {

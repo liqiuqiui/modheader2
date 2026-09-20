@@ -29,6 +29,10 @@ type HeaderOperation = "append" | "set";
 type PendingProfileDnrRule = Omit<ProfileDnrRule, "id" | "priority">;
 type UrlProfileFilter = Extract<ProfileFilter, { kind: "urlPattern" } | { kind: "urlRegex" }>;
 
+export interface ProfileDnrCompileOptions {
+  tabs?: Array<Pick<Browser.tabs.Tab, "id" | "groupId" | "windowId">>;
+}
+
 const MANAGED_PROFILE_RULE_IDS = Array.from(
   { length: MAX_PROFILE_DNR_RULES },
   (_, index) => PROFILE_DNR_RULE_ID_BASE + index,
@@ -51,7 +55,7 @@ function isJavascriptRegex(value: string): boolean {
   }
 }
 
-function isInitiatorDomain(value: string): boolean {
+function isDomain(value: string): boolean {
   if (!value || !isAscii(value) || value.length > 253) return false;
   return value
     .split(".")
@@ -98,12 +102,37 @@ function activeFilters(profile: Profile): ProfileFilter[] {
     (filter) =>
       filter.enabled &&
       !isNil(filter.value) &&
-      (typeof filter.value !== "string" || !isEmpty(filter.value.trim())),
+      (typeof filter.value !== "string" || !isEmpty(filter.value.trim())) &&
+      filter.kind !== "time",
   );
+}
+
+function hasActiveTimeFilters(profile: Profile, now = Date.now()): boolean {
+  return profile.filters
+    .filter(
+      (filter): filter is Extract<ProfileFilter, { kind: "time" }> =>
+        filter.enabled && filter.kind === "time",
+    )
+    .every((filter) => filter.value > now);
+}
+
+export function nextProfileTimeFilterExpiration(
+  profile?: Profile,
+  now = Date.now(),
+): number | null {
+  if (!profile) return null;
+  const future = profile.filters
+    .filter(
+      (filter): filter is Extract<ProfileFilter, { kind: "time" }> =>
+        filter.enabled && filter.kind === "time" && filter.value > now,
+    )
+    .map((filter) => filter.value);
+  return future.length > 0 ? Math.min(...future) : null;
 }
 
 function compileProfileCondition(
   filters: ProfileFilter[],
+  options: ProfileDnrCompileOptions,
 ): { condition: DnrCondition } | { error: string } {
   const condition: DnrCondition = {};
 
@@ -173,6 +202,55 @@ function compileProfileCondition(
   if (includedTabIds.length > 0) condition.tabIds = includedTabIds;
   if (excludedTabIds.length > 0) condition.excludedTabIds = excludedTabIds;
 
+  const tabGroupFilters = filters.filter(
+    (filter): filter is Extract<ProfileFilter, { kind: "tabGroup" }> => filter.kind === "tabGroup",
+  );
+  const windowFilters = filters.filter(
+    (filter): filter is Extract<ProfileFilter, { kind: "window" }> => filter.kind === "window",
+  );
+  const tabs = options.tabs ?? [];
+  const tabIdsFor = (kind: "tabGroup" | "window", value: number): number[] =>
+    tabs
+      .filter((tab) => (kind === "tabGroup" ? tab.groupId === value : tab.windowId === value))
+      .flatMap((tab) => (isNonNegativeInteger(tab.id) ? [tab.id] : []));
+  const includeScopedTabIds = [
+    ...tabGroupFilters
+      .filter((filter) => filter.mode === "include")
+      .flatMap((filter) => (filter.value === null ? [] : tabIdsFor("tabGroup", filter.value))),
+    ...windowFilters
+      .filter((filter) => filter.mode === "include")
+      .flatMap((filter) => (filter.value === null ? [] : tabIdsFor("window", filter.value))),
+  ];
+  const excludeScopedTabIds = [
+    ...tabGroupFilters
+      .filter((filter) => filter.mode === "exclude")
+      .flatMap((filter) => (filter.value === null ? [] : tabIdsFor("tabGroup", filter.value))),
+    ...windowFilters
+      .filter((filter) => filter.mode === "exclude")
+      .flatMap((filter) => (filter.value === null ? [] : tabIdsFor("window", filter.value))),
+  ];
+  if (
+    [...tabGroupFilters, ...windowFilters].some(
+      (filter) => filter.value === null || !isNonNegativeInteger(filter.value),
+    )
+  ) {
+    return { error: "An enabled tab group or window filter has no valid value" };
+  }
+  if (
+    [...tabGroupFilters, ...windowFilters].some((filter) => filter.mode === "include") &&
+    tabs.length === 0
+  ) {
+    return { error: "Tab group and window filters require tab context" };
+  }
+  if (includeScopedTabIds.length > 0) {
+    condition.tabIds = uniq([...(condition.tabIds ?? []), ...includeScopedTabIds]);
+  } else if ([...tabGroupFilters, ...windowFilters].some((filter) => filter.mode === "include")) {
+    return { error: "Tab group or window filters match no open tabs" };
+  }
+  if (excludeScopedTabIds.length > 0) {
+    condition.excludedTabIds = uniq([...(condition.excludedTabIds ?? []), ...excludeScopedTabIds]);
+  }
+
   const initiatorFilters = filters.filter(
     (filter): filter is Extract<ProfileFilter, { kind: "initiator" }> =>
       filter.kind === "initiator",
@@ -181,7 +259,7 @@ function compileProfileCondition(
     ...filter,
     value: filter.value.trim(),
   }));
-  if (normalizedInitiators.some((filter) => !isInitiatorDomain(filter.value))) {
+  if (normalizedInitiators.some((filter) => !isDomain(filter.value))) {
     return { error: "An enabled initiator filter has an invalid domain" };
   }
   const initiatorDomains = uniq(
@@ -197,6 +275,32 @@ function compileProfileCondition(
   if (initiatorDomains.length > 0) condition.initiatorDomains = initiatorDomains;
   if (excludedInitiatorDomains.length > 0) {
     condition.excludedInitiatorDomains = excludedInitiatorDomains;
+  }
+
+  const requestDomainFilters = filters.filter(
+    (filter): filter is Extract<ProfileFilter, { kind: "requestDomain" }> =>
+      filter.kind === "requestDomain",
+  );
+  const normalizedRequestDomains = requestDomainFilters.map((filter) => ({
+    ...filter,
+    value: filter.value.trim().toLowerCase(),
+  }));
+  if (normalizedRequestDomains.some((filter) => !isDomain(filter.value))) {
+    return { error: "An enabled request domain filter has an invalid domain" };
+  }
+  const requestDomains = uniq(
+    normalizedRequestDomains
+      .filter((filter) => filter.mode === "include")
+      .map((filter) => filter.value),
+  );
+  const excludedRequestDomains = uniq(
+    normalizedRequestDomains
+      .filter((filter) => filter.mode === "exclude")
+      .map((filter) => filter.value),
+  );
+  if (requestDomains.length > 0) condition.requestDomains = requestDomains;
+  if (excludedRequestDomains.length > 0) {
+    condition.excludedRequestDomains = excludedRequestDomains;
   }
 
   return { condition };
@@ -344,11 +448,15 @@ function finalizeRules(rules: PendingProfileDnrRule[]): ProfileDnrRule[] {
   });
 }
 
-export function compileProfileDnrRules(profile?: Profile): ProfileDnrCompilation {
+export function compileProfileDnrRules(
+  profile?: Profile,
+  options: ProfileDnrCompileOptions = {},
+): ProfileDnrCompilation {
   if (!profile?.enabled || profile.paused) return { rules: [], diagnostics: [] };
+  if (!hasActiveTimeFilters(profile)) return { rules: [], diagnostics: [] };
 
   const filters = activeFilters(profile);
-  const conditionResult = compileProfileCondition(filters);
+  const conditionResult = compileProfileCondition(filters, options);
   if ("error" in conditionResult) return failedCompilation(conditionResult.error);
   const urlResult = compileUrlFilters(filters);
   if ("error" in urlResult) return failedCompilation(urlResult.error);

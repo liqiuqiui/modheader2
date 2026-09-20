@@ -87,4 +87,17 @@ describe("Profile request matching", () => {
     expect(matches(request({ url: "https://api.example.com/v2/items" }))).toBe(true);
     expect(matches(request({ url: "https://api.example.com/items" }))).toBe(false);
   });
+
+  it("distinguishes request target domains from initiator domains", () => {
+    const matches = createProfileRequestMatcher([
+      modificationRule({
+        requestDomains: ["api.example.com"],
+        excludedRequestDomains: ["private.example.com"],
+      }),
+    ]);
+
+    expect(matches(request({ url: "https://api.example.com/data" }))).toBe(true);
+    expect(matches(request({ url: "https://other.example.com/data" }))).toBe(false);
+    expect(matches(request({ url: "https://private.example.com/data" }))).toBe(false);
+  });
 });
