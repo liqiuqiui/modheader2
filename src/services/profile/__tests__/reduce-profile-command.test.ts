@@ -337,6 +337,35 @@ describe("reduceProfileCommand", () => {
     expect(profileOf(patched).filters).toEqual([{ ...first, mode: "exclude" }, second]);
   });
 
+  it("defaults a changed filter kind to the group or window id from the command", () => {
+    const filter = createProfileFilter({ id: "filter-1", kind: "urlPattern" });
+    const initialProfile = profileWithHeader();
+    initialProfile.filters = [filter];
+    const initial = createInitialProfileDocument(initialProfile, "seed", 1);
+    const target = { currentTabId: 42, groupId: 7, windowId: 3 };
+
+    const changeKind = (kind: "tab" | "tabGroup" | "window") =>
+      profileOf(
+        applied(
+          reduceProfileCommand(
+            initial,
+            {
+              type: "changeFilterKind",
+              profileId: initialProfile.id,
+              filterId: filter.id,
+              kind,
+              ...target,
+            },
+            "a",
+          ),
+        ),
+      ).filters[0];
+
+    expect(changeKind("tab")).toMatchObject({ kind: "tab", value: 42 });
+    expect(changeKind("tabGroup")).toMatchObject({ kind: "tabGroup", value: 7 });
+    expect(changeKind("window")).toMatchObject({ kind: "window", value: 3 });
+  });
+
   it("makes stale filter value patches commute with kind changes", () => {
     const filter = {
       ...createProfileFilter({ id: "filter-1", kind: "urlPattern" }),

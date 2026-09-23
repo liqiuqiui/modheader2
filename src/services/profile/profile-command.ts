@@ -95,6 +95,8 @@ export type ProfileCommand =
       filterId: string;
       kind: FilterKind;
       currentTabId?: number;
+      groupId?: number;
+      windowId?: number;
     }
   | { type: "deleteFilter"; profileId: string; filterId: string }
   | {

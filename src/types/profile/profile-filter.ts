@@ -56,20 +56,41 @@ export function isProfileFilter(value: unknown): value is ProfileFilter {
   return isFilterValue(value.kind, value.value);
 }
 
+/**
+ * 创建或切换过滤器类型时用于推导默认取值范围的上下文。
+ * 只有 `tab` 用 Tab ID，`tabGroup` / `window` 必须取所在分组/窗口的 ID，
+ * 否则默认值永远匹配不到真实目标（会被显示为「已关闭」）。
+ */
+export interface FilterTarget {
+  currentTabId?: number;
+  groupId?: number;
+  windowId?: number;
+}
+
 export function createProfileFilter<K extends FilterKind>({
   kind,
   mode = "include",
   currentTabId,
+  groupId,
+  windowId,
   id = nanoid(),
 }: {
   kind: K;
   mode?: FilterMode;
-  currentTabId?: number;
   id?: string;
-}): ProfileFilterByKind<K> {
+} & FilterTarget): ProfileFilterByKind<K> {
   const common = { id, enabled: true, mode, comment: "" };
-  if (kind === "tab" || kind === "tabGroup" || kind === "window") {
+  if (kind === "tab") {
     const value = isNonNegativeInteger(currentTabId) ? currentTabId : null;
+    return { ...common, kind, value } as ProfileFilterByKind<K>;
+  }
+  if (kind === "tabGroup") {
+    // `groupId` is TAB_GROUP_ID_NONE (-1) for ungrouped tabs.
+    const value = isNonNegativeInteger(groupId) ? groupId : null;
+    return { ...common, kind, value } as ProfileFilterByKind<K>;
+  }
+  if (kind === "window") {
+    const value = isNonNegativeInteger(windowId) ? windowId : null;
     return { ...common, kind, value } as ProfileFilterByKind<K>;
   }
   if (kind === "resourceType") {

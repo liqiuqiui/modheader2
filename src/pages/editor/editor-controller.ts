@@ -39,8 +39,13 @@ export function useEditorController() {
       deleteProfile: state.deleteProfile,
     })),
   );
-  const { tabs, currentTabId } = useAppStore(
-    useShallow((state) => ({ tabs: state.tabs, currentTabId: state.currentTabId })),
+  const { tabs, tabGroups, tabGroupsAvailable, currentTabId } = useAppStore(
+    useShallow((state) => ({
+      tabs: state.tabs,
+      tabGroups: state.tabGroups,
+      tabGroupsAvailable: state.tabGroupsAvailable,
+      currentTabId: state.currentTabId,
+    })),
   );
   const { searchQuery, focusRequest, requestFocus, clearFocusRequest, notice } = useAppStore(
     useShallow((state) => ({
@@ -56,6 +61,8 @@ export function useEditorController() {
     profiles: profileState.profiles,
     selectedProfileId: profileState.selectedProfileId,
     tabs,
+    tabGroups,
+    tabGroupsAvailable,
     currentTabId,
     searchQuery,
     focusRequest,

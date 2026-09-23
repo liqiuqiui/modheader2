@@ -261,7 +261,11 @@ function reduceProfileCommandDocument(
 
   if (command.type === "changeFilterKind") {
     return replaceProfile(current, command.profileId, sourceId, (profile) =>
-      changeProfileFilterKind(profile, command.filterId, command.kind, command.currentTabId),
+      changeProfileFilterKind(profile, command.filterId, command.kind, {
+        currentTabId: command.currentTabId,
+        groupId: command.groupId,
+        windowId: command.windowId,
+      }),
     );
   }
 

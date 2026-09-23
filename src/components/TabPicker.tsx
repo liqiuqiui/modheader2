@@ -5,6 +5,7 @@ import { Check, ChevronDown, RefreshCw, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useThemePortalContainer } from "./ThemePortalProvider";
 import type { BrowserTab } from "../types/browser";
+import { CurrentBadge } from "./CurrentBadge";
 import { TabIcon } from "./TabIcon";
 
 function getHost(url?: string) {
@@ -38,6 +39,7 @@ export function TabPicker({
   const currentTab = tabs.find((tab) => tab.id === currentTabId);
   const isClosedTab = value !== null && !selected;
   const canUseCurrentTab = isClosedTab && currentTab?.id !== undefined;
+  const isCurrentSelection = value !== null && value === currentTabId;
 
   const filteredTabs = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -75,6 +77,7 @@ export function TabPicker({
               {host && !compact && (
                 <span className="max-w-36 truncate text-xs text-slate-400">{host}</span>
               )}
+              {isCurrentSelection && <CurrentBadge text={t("common.current")} />}
               <ChevronDown
                 aria-hidden="true"
                 className={clsx("h-4 w-4 shrink-0 text-slate-400 transition", open && "rotate-180")}
@@ -177,11 +180,7 @@ export function TabPicker({
                         {getHost(tab.url) || tab.url}
                       </span>
                     </span>
-                    {isCurrent && (
-                      <span className="rounded-full border border-[color-mix(in_srgb,var(--theme-color)_30%,white)] bg-[color-mix(in_srgb,var(--theme-color)_10%,white)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--theme-color)]">
-                        {t("common.current")}
-                      </span>
-                    )}
+                    {isCurrent && <CurrentBadge text={t("common.current")} />}
                     {!isCurrent && tab.active && (
                       <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
                         {t("tab.active")}

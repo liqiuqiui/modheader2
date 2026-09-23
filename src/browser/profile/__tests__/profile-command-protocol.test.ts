@@ -92,6 +92,29 @@ describe("profile command protocol", () => {
     ).toBe(false);
   });
 
+  it("validates the target ids carried by a filter kind change", () => {
+    const base = {
+      type: "changeFilterKind",
+      profileId: "profile-1",
+      filterId: "filter-1",
+      kind: "tabGroup",
+    } as const;
+
+    expect(
+      isProfileCommandMessage(
+        commandMessage({ ...base, currentTabId: 42, groupId: 7, windowId: 3 }),
+      ),
+    ).toBe(true);
+    // TAB_GROUP_ID_NONE (-1) means "not in a group" and is not a valid target.
+    expect(isProfileCommandMessage(commandMessage({ ...base, groupId: -1 }))).toBe(false);
+    expect(isProfileCommandMessage(commandMessage({ ...base, windowId: "3" }))).toBe(false);
+    // Unknown keys must keep failing: the command is sent across processes and
+    // a silently dropped command leaves the UI with no error to show.
+    expect(
+      isProfileCommandMessage(commandMessage({ ...base, groupId: 7, groupTitle: "Work" })),
+    ).toBe(false);
+  });
+
   it("accepts dedicated CSP rules and response headers that can be converted to CSP", () => {
     expect(
       isProfileCommandMessage(

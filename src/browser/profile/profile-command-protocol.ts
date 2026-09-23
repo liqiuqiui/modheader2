@@ -206,11 +206,21 @@ function isProfileCommand(value: unknown): value is ProfileCommand {
       );
     case "changeFilterKind":
       return (
-        hasOnlyKeys(value, ["type", "profileId", "filterId", "kind", "currentTabId"]) &&
+        hasOnlyKeys(value, [
+          "type",
+          "profileId",
+          "filterId",
+          "kind",
+          "currentTabId",
+          "groupId",
+          "windowId",
+        ]) &&
         isNonEmptyString(value.profileId) &&
         isNonEmptyString(value.filterId) &&
         isFilterKind(value.kind) &&
-        (value.currentTabId === undefined || isNonNegativeInteger(value.currentTabId))
+        (value.currentTabId === undefined || isNonNegativeInteger(value.currentTabId)) &&
+        (value.groupId === undefined || isNonNegativeInteger(value.groupId)) &&
+        (value.windowId === undefined || isNonNegativeInteger(value.windowId))
       );
     case "deleteFilter":
       return (

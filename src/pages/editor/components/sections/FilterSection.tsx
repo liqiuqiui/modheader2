@@ -11,7 +11,7 @@ import type {
   ProfileFilterPatch,
 } from "../../../../types/profile/profile-model";
 import { useEditorController } from "../../editor-controller";
-import type { BrowserTab } from "../../../../types/browser";
+import type { BrowserTab, BrowserTabGroup } from "../../../../types/browser";
 import { FILTER_LABEL_KEYS } from "../../constants";
 import { EmptyState } from "../shared/EmptyState";
 import { FilterAddPanel } from "../rules/FilterAddPanel";
@@ -22,6 +22,8 @@ import { SectionHeader } from "./SectionHeader";
 export function FilterSection({
   profile,
   tabs,
+  tabGroups,
+  tabGroupsAvailable,
   currentTabId,
   searchQuery,
   focusFilterId,
@@ -29,6 +31,8 @@ export function FilterSection({
 }: {
   profile: Profile;
   tabs: BrowserTab[];
+  tabGroups: BrowserTabGroup[];
+  tabGroupsAvailable: boolean;
   currentTabId?: number;
   searchQuery: string;
   focusFilterId?: string | null;
@@ -75,8 +79,12 @@ export function FilterSection({
   );
   const handleKindChange = useCallback(
     (filterId: string, kind: FilterKind) =>
-      void changeFilterKind(profile.id, filterId, kind, currentTab?.id),
-    [changeFilterKind, currentTab?.id, profile.id],
+      void changeFilterKind(profile.id, filterId, kind, {
+        currentTabId: currentTab?.id,
+        groupId: currentTab?.groupId,
+        windowId: currentTab?.windowId,
+      }),
+    [changeFilterKind, currentTab?.groupId, currentTab?.id, currentTab?.windowId, profile.id],
   );
   const handleDelete = useCallback(
     (filterId: string) => void deleteFilter(profile.id, filterId),
@@ -84,7 +92,13 @@ export function FilterSection({
   );
 
   const handleAdd = (kind: FilterKind, mode: FilterMode = "include") => {
-    const filter = createFilter({ kind, mode, currentTabId: currentTab?.id });
+    const filter = createFilter({
+      kind,
+      mode,
+      currentTabId: currentTab?.id,
+      groupId: currentTab?.groupId,
+      windowId: currentTab?.windowId,
+    });
     if (kind === "urlPattern" || kind === "urlRegex") {
       setLocalFocusFilterId(filter.id);
     }
@@ -158,6 +172,8 @@ export function FilterSection({
               filter={filter}
               autoFocusValue={filter.id === focusFilterId || filter.id === localFocusFilterId}
               tabs={tabs}
+              tabGroups={tabGroups}
+              tabGroupsAvailable={tabGroupsAvailable}
               currentTabId={currentTabId}
               onPatch={handlePatch}
               onKindChange={handleKindChange}

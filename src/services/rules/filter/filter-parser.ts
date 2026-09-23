@@ -1,50 +1,27 @@
-import { nanoid } from "nanoid";
+import {
+  createProfileFilter,
+  isFilterKind,
+  isFilterMode,
+  isFilterValue,
+  type FilterTarget,
+} from "../../../types/profile/profile-filter";
 import type {
   FilterKind,
   FilterMode,
   ProfileFilter,
   ProfileFilterByKind,
-  RequestMethod,
-  ResourceType,
-} from "../../../types/profile/profile-model";
-import {
-  FILTER_KINDS,
-  FILTER_MODES,
-  REQUEST_METHODS,
-  RESOURCE_TYPES,
 } from "../../../types/profile/profile-model";
 
-const FILTER_KIND_SET = new Set<string>(FILTER_KINDS);
-const FILTER_MODE_SET = new Set<string>(FILTER_MODES);
-const REQUEST_METHOD_SET = new Set<string>(REQUEST_METHODS);
-const RESOURCE_TYPE_SET = new Set<string>(RESOURCE_TYPES);
-
-export function isRequestMethod(value: unknown): value is RequestMethod {
-  return typeof value === "string" && REQUEST_METHOD_SET.has(value);
-}
-
-export function isResourceType(value: unknown): value is ResourceType {
-  return typeof value === "string" && RESOURCE_TYPE_SET.has(value);
-}
-
-export function isFilterKind(value: unknown): value is FilterKind {
-  return typeof value === "string" && FILTER_KIND_SET.has(value);
-}
-
-export function isFilterMode(value: unknown): value is FilterMode {
-  return typeof value === "string" && FILTER_MODE_SET.has(value);
-}
-
-export function isFilterValue(kind: FilterKind, value: unknown): value is ProfileFilter["value"] {
-  if (kind === "tab" || kind === "tabGroup" || kind === "window")
-    return value === null || (typeof value === "number" && Number.isInteger(value) && value >= 0);
-  if (kind === "resourceType") return isResourceType(value);
-  if (kind === "method") return isRequestMethod(value);
-  if (kind === "time") {
-    return typeof value === "number" && Number.isInteger(value) && value >= 0;
-  }
-  return typeof value === "string";
-}
+// The guards live in `types/profile/profile-filter` — the module the reducers
+// validate against. They are only re-exported here so this module keeps its
+// public surface without a second copy that can drift from the original.
+export {
+  isFilterKind,
+  isFilterMode,
+  isRequestMethod,
+  isResourceType,
+  isFilterValue,
+} from "../../../types/profile/profile-filter";
 
 export function parseFilter(input: unknown): ProfileFilter | null {
   if (!input || typeof input !== "object") return null;
@@ -69,30 +46,11 @@ export function parseFilter(input: unknown): ProfileFilter | null {
   } as ProfileFilter;
 }
 
-export function createFilter<K extends FilterKind>({
-  kind,
-  mode = "include",
-  currentTabId,
-  id = nanoid(),
-}: {
-  kind: K;
-  mode?: FilterMode;
-  currentTabId?: number;
-  id?: string;
-}): ProfileFilterByKind<K> {
-  const common = { id, enabled: true, mode, comment: "" };
-  if (kind === "tab" || kind === "tabGroup" || kind === "window") {
-    const value =
-      typeof currentTabId === "number" && Number.isInteger(currentTabId) && currentTabId >= 0
-        ? currentTabId
-        : null;
-    return { ...common, kind, value } as ProfileFilterByKind<K>;
-  }
-  if (kind === "resourceType")
-    return { ...common, kind, value: "xmlhttprequest" } as ProfileFilterByKind<K>;
-  if (kind === "method") return { ...common, kind, value: "get" } as ProfileFilterByKind<K>;
-  if (kind === "time") {
-    return { ...common, kind, value: Date.now() + 60 * 60 * 1000 } as ProfileFilterByKind<K>;
-  }
-  return { ...common, kind, value: "" } as ProfileFilterByKind<K>;
+// The default value for a new filter lives in `createProfileFilter` so the UI
+// preview and the reducer (which re-creates the filter on a kind change) can
+// never disagree about what "current tab" means for each kind.
+export function createFilter<K extends FilterKind>(
+  options: { kind: K; mode?: FilterMode; id?: string } & FilterTarget,
+): ProfileFilterByKind<K> {
+  return createProfileFilter(options);
 }

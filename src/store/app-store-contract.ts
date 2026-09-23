@@ -1,5 +1,5 @@
 import type { Locale } from "../config/locales";
-import type { BrowserTab } from "../types/browser";
+import type { BrowserTab, BrowserTabGroup } from "../types/browser";
 import type { EditorMode } from "../pages/editor/types";
 import type { ProfileState } from "../types/profile/profile-document";
 import type {
@@ -12,6 +12,7 @@ import type {
   ProfileRuleCollectionMap,
   ProfileRulePatch,
 } from "../types/profile/profile-model";
+import type { FilterTarget } from "../types/profile/profile-filter";
 import type {
   ProfileDataState,
   ProfileHistoryState,
@@ -28,6 +29,9 @@ export interface AppStoreState extends ProfileDataState, ProfileHistoryState, Pr
   notice: string;
   focusRequest: { kind: "header" | "csp" | "cookie" | "filter"; id: string } | null;
   tabs: BrowserTab[];
+  tabGroups: BrowserTabGroup[];
+  /** 运行环境是否暴露了 tabGroups API（缺失时无法显示分组名称）。 */
+  tabGroupsAvailable: boolean;
   currentTabId?: number;
   initializeEditor: (mode: EditorMode) => () => void;
   setCollapsed: (collapsed: boolean) => void;
@@ -82,7 +86,7 @@ export interface AppStoreState extends ProfileDataState, ProfileHistoryState, Pr
     profileId: string,
     filterId: string,
     kind: FilterKind,
-    currentTabId?: number,
+    target?: FilterTarget,
   ) => Promise<boolean>;
   deleteFilter: (profileId: string, filterId: string) => Promise<boolean>;
   reorderFilters: (

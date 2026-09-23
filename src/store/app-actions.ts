@@ -62,6 +62,8 @@ type ProfileOperationActions = Omit<
   | "notice"
   | "focusRequest"
   | "tabs"
+  | "tabGroups"
+  | "tabGroupsAvailable"
   | "currentTabId"
   | "initializeEditor"
   | "setCollapsed"
@@ -121,8 +123,8 @@ export function createAppActions({
       commitCommand({ type: "addFilter", profileId, filter }),
     patchFilter: async (profileId, filterId, expectedKind: FilterKind, patch: ProfileFilterPatch) =>
       commitCommand({ type: "patchFilter", profileId, filterId, expectedKind, patch }),
-    changeFilterKind: async (profileId, filterId, kind, currentTabId) =>
-      commitCommand({ type: "changeFilterKind", profileId, filterId, kind, currentTabId }),
+    changeFilterKind: async (profileId, filterId, kind, target) =>
+      commitCommand({ type: "changeFilterKind", profileId, filterId, kind, ...target }),
     deleteFilter: async (profileId, filterId) =>
       commitCommand({ type: "deleteFilter", profileId, filterId }),
     reorderFilters: async (profileId, sourceFilterId, targetFilterId) =>

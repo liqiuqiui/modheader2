@@ -54,7 +54,7 @@ describe("Profile filter array operations", () => {
       value: "example\\.com",
     };
     const profile = addProfileFilter(emptyProfile(), original);
-    const changed = changeProfileFilterKind(profile, original.id, "tab", 42);
+    const changed = changeProfileFilterKind(profile, original.id, "tab", { currentTabId: 42 });
 
     expect(changed.filters).toEqual([
       {
@@ -66,6 +66,27 @@ describe("Profile filter array operations", () => {
         value: 42,
       },
     ]);
+  });
+
+  it("defaults tab-group and window filters to the group/window id, not the tab id", () => {
+    const original = createProfileFilter({ id: "filter-1", kind: "urlPattern" });
+    const profile = addProfileFilter(emptyProfile(), original);
+    const target = { currentTabId: 42, groupId: 7, windowId: 3 };
+
+    expect(changeProfileFilterKind(profile, original.id, "tab", target).filters[0]?.value).toBe(42);
+    expect(
+      changeProfileFilterKind(profile, original.id, "tabGroup", target).filters[0]?.value,
+    ).toBe(7);
+    expect(changeProfileFilterKind(profile, original.id, "window", target).filters[0]?.value).toBe(
+      3,
+    );
+    // Ungrouped tabs must not fall back to the tab id.
+    expect(
+      changeProfileFilterKind(profile, original.id, "tabGroup", {
+        ...target,
+        groupId: -1,
+      }).filters[0]?.value,
+    ).toBeNull();
   });
 
   it("treats invalid patches and true no-ops as reference-stable", () => {

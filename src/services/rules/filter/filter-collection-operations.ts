@@ -5,6 +5,7 @@ import {
   isFilterMode,
   isFilterValue,
   isProfileFilter,
+  type FilterTarget,
 } from "../../../types/profile/profile-filter";
 import { isRecord } from "../../../types/profile/profile-guards";
 import type { Profile, ProfileFilter } from "../../../types/profile/profile-model";
@@ -63,7 +64,7 @@ export function changeProfileFilterKind(
   profile: Profile,
   filterId: string,
   kind: unknown,
-  currentTabId?: number,
+  target: FilterTarget = {},
 ): Profile {
   const index = profile.filters.findIndex((filter) => filter.id === filterId);
   if (index < 0) return profile;
@@ -71,7 +72,7 @@ export function changeProfileFilterKind(
   if (!isFilterKind(kind) || kind === filter.kind) return profile;
 
   const nextFilter = {
-    ...createProfileFilter({ id: filterId, kind, mode: filter.mode, currentTabId }),
+    ...createProfileFilter({ id: filterId, kind, mode: filter.mode, ...target }),
     enabled: filter.enabled,
     comment: filter.comment,
   };

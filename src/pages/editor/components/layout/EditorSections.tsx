@@ -11,8 +11,16 @@ import { RedirectSection } from "../sections/RedirectSection";
 
 export function EditorSections({ mode }: { mode: EditorMode }) {
   const { t } = useTranslation();
-  const { profile, tabs, currentTabId, searchQuery, focusRequest, clearFocusRequest } =
-    useEditorController();
+  const {
+    profile,
+    tabs,
+    tabGroups,
+    tabGroupsAvailable,
+    currentTabId,
+    searchQuery,
+    focusRequest,
+    clearFocusRequest,
+  } = useEditorController();
   const compact = mode === "popup";
 
   useEffect(() => {
@@ -76,6 +84,8 @@ export function EditorSections({ mode }: { mode: EditorMode }) {
       <FilterSection
         profile={profile}
         tabs={tabs}
+        tabGroups={tabGroups}
+        tabGroupsAvailable={tabGroupsAvailable}
         currentTabId={currentTabId}
         searchQuery={searchQuery}
         focusFilterId={focusRequest?.kind === "filter" ? focusRequest.id : null}

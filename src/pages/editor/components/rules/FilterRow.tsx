@@ -13,7 +13,7 @@ import {
   type ProfileFilter,
   type ProfileFilterPatch,
 } from "../../../../types/profile/profile-model";
-import type { BrowserTab } from "../../../../types/browser";
+import type { BrowserTab, BrowserTabGroup } from "../../../../types/browser";
 import { FILTER_LABEL_KEYS } from "../../constants";
 import { FilterSelect } from "./FilterSelect";
 import { FilterValueEditor } from "./FilterValueEditor";
@@ -22,6 +22,8 @@ import { filterSelectTextClass, menuItemClass } from "../shared/styles";
 function FilterRowComponent({
   filter,
   tabs,
+  tabGroups,
+  tabGroupsAvailable,
   currentTabId,
   onPatch,
   onKindChange,
@@ -33,6 +35,8 @@ function FilterRowComponent({
 }: {
   filter: ProfileFilter;
   tabs: BrowserTab[];
+  tabGroups: BrowserTabGroup[];
+  tabGroupsAvailable: boolean;
   currentTabId?: number;
   onPatch: (filterId: string, kind: FilterKind, patch: ProfileFilterPatch) => void;
   onKindChange: (filterId: string, kind: FilterKind) => void;
@@ -109,6 +113,8 @@ function FilterRowComponent({
         <FilterValueEditor
           filter={filter}
           tabs={tabs}
+          tabGroups={tabGroups}
+          tabGroupsAvailable={tabGroupsAvailable}
           currentTabId={currentTabId}
           autoFocus={autoFocusValue}
           onChange={(value) => onPatch(filter.id, filter.kind, { value })}
