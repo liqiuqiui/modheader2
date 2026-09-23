@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一分支/PR 只保留最新一次运行，避免排队浪费
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # 与本地开发环境保持一致（本地 pnpm 10.33.4 / Node 24）
+  PNPM_VERSION: "10.33.4"
+  NODE_VERSION: "24"
+
+jobs:
+  quality:
+    name: Lint / Format / Types / Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (oxlint)
+        run: pnpm lint
+
+      - name: Format check (oxfmt)
+        run: pnpm format:check
+
+      # tsc 依赖 wxt 生成的 .wxt/types，必须先 prepare
+      - name: Generate WXT types
+        run: pnpm exec wxt prepare
+
+      - name: Type check (tsc --noEmit)
+        run: pnpm compile
+
+      - name: Unit tests (vitest)
+        run: pnpm test
+
+  build:
+    name: Build (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # `-b` 传的是 wxt 的浏览器名，不是产物目录名：产物目录按
+        # <browser>-<manifestVersion> 命名（chrome/edge/opera → mv3，
+        # firefox/safari → mv2），传 chrome-mv3 会得到 chrome-mv3-mv3，
+        # 所以下面的断言与上传都用通配符。
+        # Firefox 若要提交 AMO，还需在 wxt.config.ts 配置
+        # browser_specific_settings.gecko.id（只打包不需要）。
+        browser: [chrome, firefox, edge, opera, safari]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # wxt zip 会先构建再打包，单独再 build 一次是重复工作
+      # 注意：不能用 pnpm pack（会被 pnpm 内置命令拦截并打出源码 tarball）
+      - name: Build & package extension (zip)
+        run: pnpm exec wxt zip -b ${{ matrix.browser }}
+
+      - name: Show build output
+        run: |
+          ls -lh .output/
+          ls -1 .output/*.zip
+          test -f "$(ls -d .output/*/manifest.json | head -1)" || (echo "manifest.json missing" && exit 1)
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: modheader-${{ matrix.browser }}-${{ github.sha }}
+          path: |
+            .output/*.zip
+            .output/*/
+          if-no-files-found: error
+          retention-days: 7

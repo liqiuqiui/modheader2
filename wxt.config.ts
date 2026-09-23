@@ -23,7 +23,7 @@ export default defineConfig({
     default_locale: "zh_CN",
     name: "__MSG_extensionName__",
     description: "__MSG_extensionDescription__",
-    version: "1.0.0",
+    // 不写死版本：WXT 默认取 package.json 的 version，便于 CI 按 tag 打版本
     permissions: [
       "storage",
       "declarativeNetRequest",

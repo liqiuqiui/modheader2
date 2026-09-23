@@ -1,0 +1,227 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "发布版本号，例如 1.2.0（不带 v 前缀）"
+        required: true
+      dry_run:
+        description: "仅校验商店凭据，不上传/不提交审核"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  PNPM_VERSION: "10.33.4"
+  NODE_VERSION: "24"
+
+jobs:
+  # 版本号先单独解析：矩阵 job 的 outputs 会相互覆盖，不能由矩阵产出版本号。
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Resolve version
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+  package:
+    name: Package (${{ matrix.browser }})
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # wxt 支持的全部目标，产物目录为 <browser>-<manifestVersion>：
+        # chrome/edge/opera → mv3，firefox/safari → mv2。
+        # firefox 与 opera 会额外产出 *-sources.zip（AMO 提交审核需要）。
+        browser: [chrome, firefox, edge, opera, safari]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # WXT 的 manifest.version 与 zip 文件名均取自 package.json，先对齐标签版本
+      - name: Set version from tag
+        run: npm pkg set version="${{ needs.version.outputs.version }}"
+
+      - name: Zip extension
+        run: pnpm exec wxt zip -b ${{ matrix.browser }}
+
+      # firefox 与 opera 都会产出同名的 *-sources.zip，合并进同一个 Release 时
+      # 会互相覆盖，统一改名成 <browser>-sources.zip 保证文件名唯一。
+      # 已改过名的跳过，保证这一步可以重复执行。
+      - name: Rename sources zip
+        run: |
+          shopt -s nullglob
+          for f in .output/*-sources.zip; do
+            case "$f" in
+              *-${{ matrix.browser }}-sources.zip) continue ;;
+            esac
+            mv "$f" "${f%-sources.zip}-${{ matrix.browser }}-sources.zip"
+          done
+
+      - name: List zips
+        run: ls -lh .output/*.zip
+
+      - name: Upload zips
+        uses: actions/upload-artifact@v4
+        with:
+          name: modheader-${{ needs.version.outputs.version }}-${{ matrix.browser }}
+          path: .output/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  github-release:
+    name: GitHub Release
+    needs: [version, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download zips
+        uses: actions/download-artifact@v4
+        with:
+          pattern: modheader-${{ needs.version.outputs.version }}-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: v${{ needs.version.outputs.version }}
+          files: dist/*.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(needs.version.outputs.version, '-') }}
+
+  submit:
+    name: Submit to stores
+    # Opera / Safari 只构建并附在 Release 上：publish-browser-extension
+    # 只支持 Chrome Web Store、AMO、Edge Addons 三家商店。
+    needs: [version, package]
+    runs-on: ubuntu-latest
+    # `secrets` 不能出现在 job 级 if（GitHub 不支持该上下文），
+    # 所以凭据先映射到 job 级 env，再由 step 级 if 决定是否真正提交。
+    env:
+      CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+      # Chrome Web Store 目前只支持 v1.1 的 refresh token 方式：
+      # 本仓库使用的 publish-browser-extension 4.0.5 没有服务账号（API v2）实现，
+      # 不要传 CHROME_SERVICE_ACCOUNT_*，那会被静默忽略。
+      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
+      FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+      FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+      EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+      EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+      EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+      # tag 触发时 inputs 上下文为空，显式判断事件类型，不依赖空串比较的巧合
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download zips
+        uses: actions/download-artifact@v4
+        with:
+          pattern: modheader-${{ needs.version.outputs.version }}-*
+          path: .output
+          merge-multiple: true
+
+      # 没配置任何商店凭据时跳过提交；dry_run 时仍会执行（带 --dry-run）
+      - name: Submit
+        if: env.CHROME_EXTENSION_ID != '' || env.FIREFOX_EXTENSION_ID != '' || env.EDGE_PRODUCT_ID != ''
+        run: |
+          set -euo pipefail
+
+          # 缺产物时给可读报错：ls 在 set -e + pipefail 下会直接中断整个步骤
+          find_zip() {
+            ls $1 2>/dev/null | head -1 || true
+          }
+
+          args=()
+          if [ -n "${CHROME_EXTENSION_ID:-}" ]; then
+            chrome_zip="$(find_zip '.output/*-chrome.zip')"
+            if [ -z "$chrome_zip" ]; then
+              echo "::error::找不到 Chrome 产物 zip（.output/*-chrome.zip）"
+              exit 1
+            fi
+            args+=(--chrome-zip "$chrome_zip")
+          fi
+          if [ -n "${FIREFOX_EXTENSION_ID:-}" ]; then
+            firefox_zip="$(find_zip '.output/*-firefox.zip')"
+            if [ -z "$firefox_zip" ]; then
+              echo "::error::找不到 Firefox 产物 zip（.output/*-firefox.zip）"
+              exit 1
+            fi
+            args+=(--firefox-zip "$firefox_zip")
+            # sources zip 缺失只警告，不能拼进参数（会被当成空路径）；
+            # 打包阶段已改名为 <browser>-sources.zip，避免与 opera 的同名文件冲突
+            firefox_sources_zip="$(find_zip '.output/*-firefox-sources.zip')"
+            if [ -n "$firefox_sources_zip" ]; then
+              args+=(--firefox-sources-zip "$firefox_sources_zip")
+            else
+              echo "::warning::没有找到 Firefox sources zip（.output/*-firefox-sources.zip），AMO 审核可能需要它"
+            fi
+          fi
+          if [ -n "${EDGE_PRODUCT_ID:-}" ]; then
+            # Edge 现在有独立构建，不再复用 Chrome 的 zip
+            edge_zip="$(find_zip '.output/*-edge.zip')"
+            if [ -z "$edge_zip" ]; then
+              echo "::error::找不到 Edge 产物 zip（.output/*-edge.zip）"
+              exit 1
+            fi
+            args+=(--edge-zip "$edge_zip")
+          fi
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          pnpm exec wxt submit "${args[@]}"
