@@ -2,10 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import { HeaderRuleRow } from "../rules/HeaderRuleRow";
-import {
-  createHeaderRule,
-  isContentSecurityPolicyHeaderName,
-} from "../../../../services/rules/header/header-parser";
+import { isContentSecurityPolicyHeaderName } from "../../../../types/profile/profile-csp";
+import { createHeaderRule } from "../../../../types/profile/profile-factory";
 import type { HeaderRule, ProfileRuleCollection } from "../../../../types/profile/profile-model";
 import { useEditorController } from "../../editor-controller";
 import { REQUEST_HEADER_NAME_SUGGESTIONS, RESPONSE_HEADER_NAME_SUGGESTIONS } from "../../constants";

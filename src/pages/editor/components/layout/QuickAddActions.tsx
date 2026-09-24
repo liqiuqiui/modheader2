@@ -1,11 +1,13 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Filter, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { createCspRule } from "../../../../services/rules/csp/csp-parser";
-import { createCookieRule } from "../../../../services/rules/cookie/cookie-parser";
-import { createRedirectRule } from "../../../../services/rules/redirect/redirect-parser";
 import { createFilter } from "../../../../services/rules/filter/filter-parser";
-import { createHeaderRule } from "../../../../services/rules/header/header-parser";
+import {
+  createCookieRule,
+  createCspRule,
+  createHeaderRule,
+  createRedirectRule,
+} from "../../../../types/profile/profile-factory";
 import { useEditorController } from "../../editor-controller";
 import { menuItemClass } from "../shared/styles";
 

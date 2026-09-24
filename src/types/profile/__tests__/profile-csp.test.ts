@@ -25,6 +25,10 @@ describe("Content-Security-Policy helpers", () => {
       directive: "script-src",
       value: "'self'",
     });
+    expect(splitCspDirective("script-src 'self'\tcdn")).toEqual({
+      directive: "script-src",
+      value: "'self'\tcdn",
+    });
     expect(joinCspDirective(" script-src ", "  'self'")).toBe("script-src 'self'");
     expect(joinCspDirective("", "'self'")).toBe("'self'");
   });

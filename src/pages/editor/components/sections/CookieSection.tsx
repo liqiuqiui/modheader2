@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
-import { createCookieRule } from "../../../../services/rules/cookie/cookie-parser";
 import type { NameValueRule } from "../../../../types/profile/profile-model";
+import { createCookieRule } from "../../../../types/profile/profile-factory";
 import { useEditorController } from "../../editor-controller";
 import { CookieRuleRow } from "../rules/CookieRuleRow";
 import { EmptyState } from "../shared/EmptyState";

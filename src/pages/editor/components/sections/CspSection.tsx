@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
-import {
-  CONTENT_SECURITY_POLICY_HEADER,
-  createCspRule,
-} from "../../../../services/rules/csp/csp-parser";
+import { CONTENT_SECURITY_POLICY_HEADER } from "../../../../types/profile/profile-csp";
+import { createCspRule } from "../../../../types/profile/profile-factory";
 import type { CspRule } from "../../../../types/profile/profile-model";
 import { useEditorController } from "../../editor-controller";
 import { CspRuleRow } from "../rules/CspRuleRow";

@@ -1,5 +1,5 @@
+import { createCspDirectiveValue } from "../../../types/profile/profile-csp";
 import type { CspRule } from "../../../types/profile/profile-model";
-import { createCspDirectiveValue } from "./csp-parser";
 
 export function patchCspRule(rule: CspRule, patch: Partial<CspRule>): CspRule {
   return { ...rule, ...patch, id: rule.id };

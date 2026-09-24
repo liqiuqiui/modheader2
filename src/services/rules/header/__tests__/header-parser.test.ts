@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  createHeaderRule,
-  isContentSecurityPolicyHeaderName,
-  normalizeHeaderRule,
-  parseHeaderRule,
-} from "../header-parser";
+import { createHeaderRule } from "../../../../types/profile/profile-factory";
+import { normalizeHeaderRule, parseHeaderRule } from "../header-parser";
 
 describe("header parser", () => {
   it("creates a valid empty rule", () => {
@@ -28,9 +24,5 @@ describe("header parser", () => {
 
   it("rejects malformed input", () => {
     expect(parseHeaderRule({ name: "x" })).toBeNull();
-  });
-
-  it("recognizes CSP header names case-insensitively", () => {
-    expect(isContentSecurityPolicyHeaderName(" content-security-policy ")).toBe(true);
   });
 });

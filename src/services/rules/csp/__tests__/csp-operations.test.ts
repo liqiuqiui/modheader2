@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCspRule } from "../csp-parser";
+import { createCspRule } from "../../../../types/profile/profile-factory";
 import { patchCspRule } from "../csp-operations";
 
 describe("csp operations", () => {

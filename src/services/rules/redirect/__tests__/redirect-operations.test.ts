@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRedirectRule } from "../redirect-parser";
+import { createRedirectRule } from "../../../../types/profile/profile-factory";
 import { patchRedirectRule } from "../redirect-operations";
 
 describe("redirect operations", () => {

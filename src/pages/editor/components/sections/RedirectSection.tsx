@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { createRedirectRule } from "../../../../services/rules/redirect/redirect-parser";
 import type { NameValueRule } from "../../../../types/profile/profile-model";
+import { createRedirectRule } from "../../../../types/profile/profile-factory";
 import { useEditorController } from "../../editor-controller";
 import { EmptyState } from "../shared/EmptyState";
 import { RedirectRuleRow } from "../rules/RedirectRuleRow";

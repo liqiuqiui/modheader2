@@ -10,21 +10,16 @@ export function isContentSecurityPolicyHeaderRule(rule: HeaderRule): boolean {
   return isContentSecurityPolicyHeaderName(rule.name);
 }
 
+/** Splits `"script-src 'self'"` into its directive and value.
+ * The split happens at the first whitespace, so a tab inside the value stays
+ * part of the value instead of being treated as a separator. */
 export function splitCspDirective(input: string): { directive: string; value: string } {
-  const tabIndex = input.indexOf("\t");
-  if (tabIndex >= 0) {
-    return {
-      directive: input.slice(0, tabIndex).trim(),
-      value: input.slice(tabIndex + 1).trimStart(),
-    };
-  }
-
   const normalized = input.trimStart();
   const separatorIndex = normalized.search(/\s/);
   if (separatorIndex < 0) return { directive: normalized, value: "" };
   return {
     directive: normalized.slice(0, separatorIndex),
-    value: normalized.slice(separatorIndex).trimStart(),
+    value: normalized.slice(separatorIndex + 1).trimStart(),
   };
 }
 
