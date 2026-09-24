@@ -97,11 +97,20 @@ jobs:
       - name: List zips
         run: ls -lh .output/*.zip
 
+      # 同 CI：.output 是点开头目录且被 gitignore，artifact 的 glob 会漏掉它，
+      # 拷到普通目录后再上传。
+      - name: Collect zips
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cp .output/*.zip artifacts/
+          ls -lh artifacts/
+
       - name: Upload zips
         uses: actions/upload-artifact@v7
         with:
           name: modheader-${{ needs.version.outputs.version }}-${{ matrix.browser }}
-          path: .output/*.zip
+          path: artifacts/
           if-no-files-found: error
           retention-days: 30
 

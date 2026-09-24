@@ -100,12 +100,22 @@ jobs:
           ls -1 .output/*.zip
           test -f "$(ls -d .output/*/manifest.json | head -1)" || (echo "manifest.json missing" && exit 1)
 
+      # upload-artifact 的 glob 匹配不到 .output（点开头目录且被 gitignore），
+      # 直接上传会报 No files were found。先拷到普通目录再上传。
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/unpacked
+          cp .output/*.zip artifacts/
+          for d in .output/*/; do
+            cp -R "$d" artifacts/unpacked/
+          done
+          ls -lhR artifacts/
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
           name: modheader-${{ matrix.browser }}-${{ github.sha }}
-          path: |
-            .output/*.zip
-            .output/*/
+          path: artifacts/
           if-no-files-found: error
           retention-days: 7
