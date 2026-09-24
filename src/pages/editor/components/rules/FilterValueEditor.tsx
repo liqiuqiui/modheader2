@@ -99,9 +99,11 @@ export function FilterValueEditor({
         swatch: group ? TAB_GROUP_COLORS[group.color] : undefined,
       };
     });
-    if (filter.value === null) {
-      options.unshift({ value: "", label: t("filter.notSet") });
-    } else if (!tabsByGroup.has(filter.value)) {
+    // A null value means "not configured yet", not a choice the user made, so
+    // it is rendered as a placeholder by `FilterSelect` instead of an entry.
+    // A concrete value whose group is gone is the opposite case: it has to stay
+    // listed, otherwise the trigger would show a bare group id.
+    if (filter.value !== null && !tabsByGroup.has(filter.value)) {
       options.unshift({ value: String(filter.value), label: t("filter.tabGroupClosed") });
     }
     return (
@@ -109,7 +111,7 @@ export function FilterValueEditor({
         <FilterSelect
           ariaLabel={t(FILTER_LABEL_KEYS[filter.kind])}
           value={filter.value === null ? "" : String(filter.value)}
-          placeholder={t("filter.notSet")}
+          placeholder={t("filter.tabGroupPlaceholder")}
           onValueChange={(value) => onChange(value ? Number(value) : null)}
           className="w-full"
           itemClassName={filterSelectTextClass}
@@ -147,9 +149,7 @@ export function FilterValueEditor({
         badge: id === currentWindowId ? t("common.current") : undefined,
       };
     });
-    if (filter.value === null) {
-      options.unshift({ value: "", label: t("filter.notSet") });
-    } else if (!tabsByWindow.has(filter.value)) {
+    if (filter.value !== null && !tabsByWindow.has(filter.value)) {
       options.unshift({
         value: String(filter.value),
         label: `#${filter.value}`,
@@ -160,7 +160,7 @@ export function FilterValueEditor({
       <FilterSelect
         ariaLabel={t(FILTER_LABEL_KEYS[filter.kind])}
         value={filter.value === null ? "" : String(filter.value)}
-        placeholder={t("filter.notSet")}
+        placeholder={t("filter.windowPlaceholder")}
         onValueChange={(value) => onChange(value ? Number(value) : null)}
         className="min-w-0 flex-1"
         itemClassName={filterSelectTextClass}

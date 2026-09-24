@@ -55,6 +55,7 @@ export function FilterSelect<T extends string>({
   const selected = options.find((option) => option.value === value);
   // An empty value with no matching option would otherwise render a blank
   // trigger, leaving "nothing selected" indistinguishable from a broken row.
+  const isPlaceholder = selected === undefined && !value && placeholder !== undefined;
   const selectedLabel = selected?.label ?? (value ? value : (placeholder ?? ""));
 
   return (
@@ -74,7 +75,13 @@ export function FilterSelect<T extends string>({
               (group titles can be long) or it would overflow the trigger, while
               the sublabel takes whatever space is left. */}
           <span
-            className={cn("min-w-0 truncate text-left", selected?.sublabel ? "shrink" : "flex-1")}
+            className={cn(
+              "min-w-0 truncate text-left",
+              selected?.sublabel ? "shrink" : "flex-1",
+              // Muted so an unset value reads as "not filled in yet" instead of
+              // looking like a real selection.
+              isPlaceholder && "text-muted-foreground",
+            )}
           >
             {selectedLabel}
           </span>
