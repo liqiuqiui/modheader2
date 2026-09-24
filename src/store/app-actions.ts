@@ -3,6 +3,7 @@ import type { Locale } from "../config/locales";
 import i18n from "../i18n";
 import type { ProfileCommand } from "../services/profile/profile-command";
 import { randomProfileColor } from "../types/profile/profile-appearance";
+import { normalizeFilterTarget } from "../types/profile/profile-filter";
 import {
   withPreferredProfileSelection,
   type ProfileState,
@@ -124,7 +125,13 @@ export function createAppActions({
     patchFilter: async (profileId, filterId, expectedKind: FilterKind, patch: ProfileFilterPatch) =>
       commitCommand({ type: "patchFilter", profileId, filterId, expectedKind, patch }),
     changeFilterKind: async (profileId, filterId, kind, target) =>
-      commitCommand({ type: "changeFilterKind", profileId, filterId, kind, ...target }),
+      commitCommand({
+        type: "changeFilterKind",
+        profileId,
+        filterId,
+        kind,
+        ...normalizeFilterTarget(target),
+      }),
     deleteFilter: async (profileId, filterId) =>
       commitCommand({ type: "deleteFilter", profileId, filterId }),
     reorderFilters: async (profileId, sourceFilterId, targetFilterId) =>

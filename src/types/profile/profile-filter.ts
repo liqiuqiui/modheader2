@@ -67,6 +67,19 @@ export interface FilterTarget {
   windowId?: number;
 }
 
+/**
+ * 把 `FilterTarget` 收敛成可跨进程发送的形态。
+ * 未分组标签页的 `groupId` 是 `TAB_GROUP_ID_NONE`（-1），它不是有效目标：
+ * 直接放进命令会被后台校验拒绝，客户端只能看到一条无意义的失败提示。
+ */
+export function normalizeFilterTarget(target: FilterTarget = {}): FilterTarget {
+  const normalized: FilterTarget = {};
+  if (isNonNegativeInteger(target.currentTabId)) normalized.currentTabId = target.currentTabId;
+  if (isNonNegativeInteger(target.groupId)) normalized.groupId = target.groupId;
+  if (isNonNegativeInteger(target.windowId)) normalized.windowId = target.windowId;
+  return normalized;
+}
+
 export function createProfileFilter<K extends FilterKind>({
   kind,
   mode = "include",
