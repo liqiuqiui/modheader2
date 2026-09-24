@@ -1,7 +1,33 @@
 {
   "name": "modheader-v2",
   "version": "1.0.0",
-  "description": "ModHeader clone - Modify HTTP request/response headers",
+  "description": "实时修改 HTTP 请求头、响应头、CSP、Cookie 与 URL 重定向的浏览器扩展，多 Profile 切换 + 精细化过滤条件。",
+  "keywords": [
+    "browser-extension",
+    "chrome-extension",
+    "content-security-policy",
+    "cookie",
+    "debugging",
+    "declarative-net-request",
+    "developer-tools",
+    "http-headers",
+    "modheader",
+    "react",
+    "request-headers",
+    "response-headers",
+    "typescript",
+    "url-redirection",
+    "web-extension",
+    "wxt"
+  ],
+  "homepage": "https://github.com/liqiuqiui/modheader2#readme",
+  "bugs": {
+    "url": "https://github.com/liqiuqiui/modheader2/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liqiuqiui/modheader2.git"
+  },
   "scripts": {
     "dev": "wxt --port 3003",
     "build": "wxt build",
