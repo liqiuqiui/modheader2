@@ -62,9 +62,6 @@ importers:
       react-i18next:
         specifier: ^17.0.11
         version: 17.0.11(i18next@26.3.6(typescript@5.9.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
-      shadcn:
-        specifier: ^4.16.1
-        version: 4.16.1(typescript@5.9.3)
       tailwind-merge:
         specifier: ^2.5.4
         version: 2.6.1
@@ -99,6 +96,9 @@ importers:
       oxlint:
         specifier: ^1.76.0
         version: 1.76.0
+      shadcn:
+        specifier: ^4.16.1
+        version: 4.16.1(typescript@5.9.3)
       tailwindcss:
         specifier: ^4.0.0
         version: 4.3.3
