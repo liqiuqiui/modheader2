@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import type { NameValueRule } from "../../../../types/profile/profile-model";
 import { createRedirectRule } from "../../../../types/profile/profile-factory";
@@ -12,10 +13,12 @@ export function RedirectSection({
   profileId,
   replacements,
   searchQuery,
+  compact = false,
 }: {
   profileId: string;
   replacements: NameValueRule[];
   searchQuery: string;
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const { actions } = useEditorController();
@@ -50,16 +53,20 @@ export function RedirectSection({
         }}
         onClear={() => void clearRules(profileId, "redirects")}
       />
-      <SectionContent open={open} className="space-y-2">
+      <SectionContent open={open} className={clsx(compact ? "space-y-1.5" : "space-y-2")}>
         {visible.map((item) => (
           <RedirectRuleRow
             key={item.id}
             replacement={item}
             onChange={handleChange}
             onDelete={handleDelete}
+            compact={compact}
           />
         ))}
         {replacements.length === 0 && <EmptyState label={t("redirect.none")} />}
+        {replacements.length > 0 && visible.length === 0 && (
+          <EmptyState label={t("section.noMatchedRules")} />
+        )}
       </SectionContent>
     </section>
   );

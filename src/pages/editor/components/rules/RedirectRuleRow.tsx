@@ -12,10 +12,12 @@ function RedirectRuleRowComponent({
   replacement,
   onChange,
   onDelete,
+  compact = false,
 }: {
   replacement: NameValueRule;
   onChange: (ruleId: string, patch: Partial<NameValueRule>) => void;
   onDelete: (ruleId: string) => void;
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const [showComment, setShowComment] = useState(Boolean(replacement.comment));
@@ -25,7 +27,8 @@ function RedirectRuleRowComponent({
   return (
     <div
       className={clsx(
-        "rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm",
+        "rounded-xl border border-slate-200 bg-white shadow-sm",
+        compact ? "p-1.5" : "p-2.5",
         !replacement.enabled && "opacity-60",
       )}
     >

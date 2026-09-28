@@ -102,7 +102,8 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
       }
       showNotice(t("import.success", { count }));
     } catch (importError) {
-      window.alert(
+      // A native alert is suppressed inside the popup on some browsers.
+      showNotice(
         t("import.failed", {
           message: importError instanceof Error ? importError.message : t("import.invalid"),
         }),

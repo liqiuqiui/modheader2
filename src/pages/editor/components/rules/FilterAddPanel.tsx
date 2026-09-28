@@ -48,14 +48,18 @@ export function FilterAddPanel({
         </button>
       </div>
 
-      <div role="tablist" aria-label={t("filter.chooseType")} className="mt-4 flex flex-wrap gap-2">
+      <div
+        role="radiogroup"
+        aria-label={t("filter.chooseType")}
+        className="mt-4 flex flex-wrap gap-2"
+      >
         {FILTER_KINDS.map((kind) => {
           const selected = draftKind === kind;
           return (
             <button
               type="button"
-              role="tab"
-              aria-selected={selected}
+              role="radio"
+              aria-checked={selected}
               key={kind}
               onClick={() => onKindChange(kind)}
               className={clsx(
@@ -73,6 +77,7 @@ export function FilterAddPanel({
 
       <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3">
         <div
+          role="group"
           className="inline-flex rounded-lg border border-slate-200 bg-white p-1"
           aria-label={t("filter.modeLabel")}
         >

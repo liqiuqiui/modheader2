@@ -79,6 +79,7 @@ export function EditorSections({ mode }: { mode: EditorMode }) {
           profileId={profile.id}
           replacements={redirects}
           searchQuery={searchQuery}
+          compact={compact}
         />
       )}
       <FilterSection
