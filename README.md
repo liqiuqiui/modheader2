@@ -57,4 +57,4 @@ pnpm build  # 构建到 .output/chrome-mv3
 
 ## 开发
 
-基于 WXT + React 19 + TypeScript + Zustand；测试覆盖 24 个文件 / 198 个用例，CI 会执行 lint、格式检查、类型检查、测试与 Chromium 三端构建。
+基于 WXT + React 19 + TypeScript + Zustand；测试覆盖 24 个文件 / 199 个用例，CI 会执行 lint、格式检查、类型检查、测试与 Chromium 三端构建。

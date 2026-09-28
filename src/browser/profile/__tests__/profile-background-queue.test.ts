@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createDocumentMutationQueue, createLatestTask } from "../profile-background-queue";
 
 describe("profile background queue", () => {
-  it("serializes document mutations and continues after rejection", async () => {
+  it("serializes document mutations", async () => {
     const queue = createDocumentMutationQueue();
     const events: string[] = [];
     let releaseFirst!: () => void;
@@ -25,6 +25,17 @@ describe("profile background queue", () => {
     await expect(first).resolves.toBe(1);
     await expect(second).resolves.toBe(2);
     expect(events).toEqual(["first:start", "first:end", "second"]);
+  });
+
+  it("continues after a rejected mutation", async () => {
+    const queue = createDocumentMutationQueue();
+    const rejected = queue(async () => {
+      throw new Error("storage unavailable");
+    });
+    await expect(rejected).rejects.toThrow("storage unavailable");
+
+    const next = queue(async () => 2);
+    await expect(next).resolves.toBe(2);
   });
 
   it("coalesces notifications while a task is running", async () => {
