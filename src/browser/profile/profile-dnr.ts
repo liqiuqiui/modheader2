@@ -1,4 +1,4 @@
-import { isEmpty, isNil, uniq } from "lodash-es";
+import { isEmpty, uniq } from "lodash-es";
 import { browser, type Browser } from "wxt/browser";
 import {
   CONTENT_SECURITY_POLICY_HEADER,
@@ -8,6 +8,7 @@ import {
 import { isNonNegativeInteger } from "../../types/profile/profile-guards";
 import type {
   CspRule,
+  FilterKind,
   HeaderRule,
   NameValueRule,
   Profile,
@@ -97,13 +98,28 @@ export function countEnabledProfileModifications(profile?: Profile): number {
   );
 }
 
+/**
+ * A tab, tab group or window filter that was never bound to a concrete target
+ * keeps its null value on purpose: it has to reach the compiler, which reports
+ * "no valid target" instead of silently widening the rule to every request.
+ */
+const NULLABLE_FILTER_KINDS = new Set<FilterKind>(["tab", "tabGroup", "window"]);
+
+/**
+ * Every other kind is read with `.trim()` / `.toLowerCase()`, so a null value
+ * coming from a document that predates the per-kind guards would throw and
+ * take the whole sync down. Those filters are skipped instead.
+ */
+function hasCompilableValue(filter: ProfileFilter): boolean {
+  if (NULLABLE_FILTER_KINDS.has(filter.kind)) return true;
+  const value: unknown = filter.value;
+  if (typeof value === "string") return !isEmpty(value.trim());
+  return value !== null && value !== undefined;
+}
+
 function activeFilters(profile: Profile): ProfileFilter[] {
   return profile.filters.filter(
-    (filter) =>
-      filter.enabled &&
-      !isNil(filter.value) &&
-      (typeof filter.value !== "string" || !isEmpty(filter.value.trim())) &&
-      filter.kind !== "time",
+    (filter) => filter.enabled && filter.kind !== "time" && hasCompilableValue(filter),
   );
 }
 
@@ -384,14 +400,27 @@ function contentSecurityPolicyToDnr(
   };
 }
 
+/** Cookie header syntax: `;` would start a new pair and `,` / whitespace are
+ * not allowed inside a cookie-pair, so such values must never be serialized. */
+const COOKIE_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const COOKIE_VALUE_PATTERN = /^[!#$%&'()*+\-./:<=>?@[\]^_`{|}~0-9A-Za-z]*$/;
+
+function isSerializableCookieRule(cookie: NameValueRule): boolean {
+  return (
+    isEffectiveCookieRule(cookie) &&
+    COOKIE_NAME_PATTERN.test(cookie.name.trim()) &&
+    COOKIE_VALUE_PATTERN.test(cookie.value.trim())
+  );
+}
+
 function cookiesToDnr(
   cookies: NameValueRule[],
   condition: DnrCondition,
   urlFilter?: UrlProfileFilter,
 ): PendingProfileDnrRule | null {
   const value = cookies
-    .filter(isEffectiveCookieRule)
-    .map((cookie) => `${cookie.name.trim()}=${cookie.value}`)
+    .filter(isSerializableCookieRule)
+    .map((cookie) => `${cookie.name.trim()}=${cookie.value.trim()}`)
     .join("; ");
   if (!value) return null;
 

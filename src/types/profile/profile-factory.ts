@@ -1,5 +1,11 @@
 import { nanoid } from "nanoid";
-import { randomProfileColor } from "./profile-appearance";
+import {
+  getProfileShortTitle,
+  getProfileTextColor,
+  isProfileBackgroundColor,
+  randomProfileColor,
+} from "./profile-appearance";
+import { isNonEmptyString } from "./profile-guards";
 import type {
   CspRule,
   HeaderRule,
@@ -77,15 +83,19 @@ export function createProfile({
   id?: string;
 }): Profile {
   if (!title) throw new Error("Profile title is required");
+  if (!isNonEmptyString(id)) throw new Error("Profile id is required");
+  if (!isProfileBackgroundColor(backgroundColor)) {
+    throw new Error("Profile background color must be a hex color");
+  }
   const rules = createEditorRules();
   const filters = createEditorFilters();
   return {
     version: 1,
     id,
     title,
-    shortTitle: title.at(-1) as string,
+    shortTitle: getProfileShortTitle(title),
     backgroundColor,
-    textColor: "#ffffff",
+    textColor: getProfileTextColor(backgroundColor),
     hideComment: true,
     rules,
     filters,

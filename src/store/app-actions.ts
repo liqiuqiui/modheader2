@@ -19,7 +19,7 @@ import type {
   ProfileRulePatch,
 } from "../types/profile/profile-model";
 import type { AppStoreState } from "./app-store-contract";
-import { profileStateOf } from "./app-state";
+import { HISTORY_LIMIT, profileStateOf } from "./app-state";
 import type { AppRuntime } from "./app-runtime";
 import { waitForPendingCommands } from "./app-runtime";
 
@@ -72,6 +72,7 @@ type ProfileOperationActions = Omit<
   | "showNotice"
   | "requestFocus"
   | "clearFocusRequest"
+  | "clearError"
 >;
 
 interface ProfileOperationActionsContext {
@@ -193,7 +194,7 @@ export function createAppActions({
         {
           recordHistory: false,
           past: state.past.slice(0, -1),
-          future: [profileStateOf(state), ...state.future].slice(0, 50),
+          future: [profileStateOf(state), ...state.future].slice(0, HISTORY_LIMIT),
         },
       );
     },
@@ -210,7 +211,7 @@ export function createAppActions({
         },
         {
           recordHistory: false,
-          past: [...state.past, profileStateOf(state)].slice(-50),
+          past: [...state.past, profileStateOf(state)].slice(-HISTORY_LIMIT),
           future: state.future.slice(1),
         },
       );

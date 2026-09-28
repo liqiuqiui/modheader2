@@ -12,8 +12,10 @@ export interface HeaderRule extends EntityIdentity {
   name: string;
   value: string;
   comment: string;
-  appendMode?: AppendMode;
-  sendEmptyHeader?: boolean;
+  /** Required: `isHeaderRule` validates both fields, and the DNR compiler maps
+   * the mode straight to a `set` / `append` operation. */
+  appendMode: AppendMode;
+  sendEmptyHeader: boolean;
 }
 
 export interface CspRule extends EntityIdentity {
@@ -64,63 +66,6 @@ export const RESOURCE_TYPES = [
 ] as const;
 
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
-
-export const ALL_RESOURCE_TYPES = [
-  ...RESOURCE_TYPES,
-  "ping",
-  "csp_report",
-  "websocket",
-  "webtransport",
-  "webbundle",
-] as const;
-
-export interface UrlFilter extends EntityIdentity {
-  enabled: boolean;
-  urlRegex: string;
-  comment: string;
-}
-
-export interface DomainFilter extends EntityIdentity {
-  enabled: boolean;
-  domain: string;
-  comment: string;
-}
-
-export interface ResourceFilter extends EntityIdentity {
-  enabled: boolean;
-  resourceType: ResourceType[];
-  comment: string;
-}
-
-export interface TabFilter extends EntityIdentity {
-  enabled: boolean;
-  tabId: number | null;
-  comment: string;
-}
-
-export interface TabGroupFilter extends EntityIdentity {
-  enabled: boolean;
-  groupId: number | null;
-  comment: string;
-}
-
-export interface WindowFilter extends EntityIdentity {
-  enabled: boolean;
-  windowId: number | null;
-  comment: string;
-}
-
-export interface TimeFilter extends EntityIdentity {
-  enabled: boolean;
-  expirationTimeMs: number;
-  comment: string;
-}
-
-export interface RequestMethodFilter extends EntityIdentity {
-  enabled: boolean;
-  methods: RequestMethod[];
-  comment: string;
-}
 
 /** Editor command filter shape retained internally while the canonical
  * persisted shape uses the dedicated filter arrays above. */
@@ -240,13 +185,3 @@ export type ProfileMetadataPatch = Partial<
     "title" | "shortTitle" | "backgroundColor" | "textColor" | "hideComment" | "enabled" | "paused"
   >
 >;
-
-export type AnyProfileFilter =
-  | UrlFilter
-  | DomainFilter
-  | ResourceFilter
-  | TabFilter
-  | TabGroupFilter
-  | WindowFilter
-  | TimeFilter
-  | RequestMethodFilter;

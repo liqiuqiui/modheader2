@@ -1,6 +1,6 @@
 import type { PersistedProfile, PersistedProfileState, Profile } from "./profile-model";
 import { hasExactKeys, isArrayOf, isRecord } from "./profile-guards";
-import { isProfile } from "./profile-validation";
+import { isProfile, isValidProfileSelection } from "./profile-validation";
 
 export function toPersistedProfile(profile: Profile): PersistedProfile {
   return structuredClone(profile);
@@ -45,10 +45,7 @@ export function isPersistedProfileState(value: unknown): value is PersistedProfi
     return false;
   }
 
-  const profileIds = value.profiles.map((profile) => profile.id);
-  if (new Set(profileIds).size !== profileIds.length) return false;
-  if (value.profiles.length === 0) return value.selectedProfileId === null;
-  return value.selectedProfileId !== null && profileIds.includes(value.selectedProfileId);
+  return isValidProfileSelection(value.profiles, value.selectedProfileId);
 }
 
 export function isPersistedProfile(value: unknown): value is PersistedProfile {

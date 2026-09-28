@@ -1,7 +1,6 @@
 import type { Locale } from "../config/locales";
 import type { BrowserTab, BrowserTabGroup } from "../types/browser";
 import type { EditorMode } from "../pages/editor/types";
-import type { ProfileState } from "../types/profile/profile-document";
 import type {
   FilterKind,
   Profile,
@@ -13,14 +12,7 @@ import type {
   ProfileRulePatch,
 } from "../types/profile/profile-model";
 import type { FilterTarget } from "../types/profile/profile-filter";
-import type {
-  ProfileDataState,
-  ProfileHistoryState,
-  ProfileSyncState,
-  ProfileSyncStatus,
-} from "./app-state";
-
-export type ProfileOperationStatus = ProfileSyncStatus;
+import type { ProfileDataState, ProfileHistoryState, ProfileSyncState } from "./app-state";
 
 export interface AppStoreState extends ProfileDataState, ProfileHistoryState, ProfileSyncState {
   mode: EditorMode;
@@ -40,6 +32,7 @@ export interface AppStoreState extends ProfileDataState, ProfileHistoryState, Pr
   requestFocus: (kind: "header" | "csp" | "cookie" | "filter", id: string) => void;
   clearFocusRequest: () => void;
   initialize: (locale: Locale) => Promise<void>;
+  clearError: () => void;
   selectProfile: (profileId: string) => Promise<boolean>;
   patchProfile: (profileId: string, patch: ProfileMetadataPatch) => Promise<boolean>;
   addRule: <K extends ProfileRuleCollection>(
@@ -105,5 +98,3 @@ export interface AppStoreState extends ProfileDataState, ProfileHistoryState, Pr
   undo: () => Promise<boolean>;
   redo: () => Promise<boolean>;
 }
-
-export type ProfileStateSnapshot = Pick<ProfileState, "profiles" | "selectedProfileId">;

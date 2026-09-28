@@ -69,6 +69,16 @@ const invalidEnabledIncludes: Array<{
     },
     diagnostic: "An enabled request domain filter has an invalid domain",
   },
+  {
+    label: "unresolved tab",
+    filter: createProfileFilter({ id: "unresolved-tab", kind: "tab" }),
+    diagnostic: "An enabled tab filter has no valid tab",
+  },
+  {
+    label: "unresolved tab group",
+    filter: createProfileFilter({ id: "unresolved-tab-group", kind: "tabGroup" }),
+    diagnostic: "An enabled tab group or window filter has no valid value",
+  },
 ];
 
 describe("Profile DNR compilation", () => {
@@ -352,14 +362,26 @@ describe("Profile DNR compilation", () => {
     expect(compilation.rules).toHaveLength(1);
   });
 
-  it("ignores enabled filters without a value", () => {
+  it("ignores enabled filters with an empty value", () => {
     const compilation = compileProfileDnrRules(
       profileWithFilters([
         createProfileFilter({ id: "empty-url", kind: "urlPattern" }),
         createProfileFilter({ id: "empty-initiator", kind: "initiator" }),
-        createProfileFilter({ id: "unresolved-tab", kind: "tab" }),
       ]),
     );
+
+    expect(compilation.diagnostics).toEqual([]);
+    expect(compilation.rules).toHaveLength(1);
+  });
+
+  it("skips a null value on a filter kind that requires one", () => {
+    // A document written before the per-kind guards would otherwise reach
+    // `value.trim()` and throw, taking the whole sync down with it.
+    const dirty = {
+      ...createProfileFilter({ id: "null-url", kind: "urlPattern" }),
+      value: null,
+    } as unknown as ProfileFilter;
+    const compilation = compileProfileDnrRules(profileWithFilters([dirty]));
 
     expect(compilation.diagnostics).toEqual([]);
     expect(compilation.rules).toHaveLength(1);
@@ -654,6 +676,53 @@ describe("Profile DNR compilation", () => {
       { id: PROFILE_DNR_RULE_ID_BASE + 3, priority: 998, type: "modifyHeaders" },
       { id: PROFILE_DNR_RULE_ID_BASE + 4, priority: 5000, type: "redirect" },
       { id: PROFILE_DNR_RULE_ID_BASE + 5, priority: 4999, type: "redirect" },
+    ]);
+  });
+
+  it("rewrites $1 placeholders into the backslash form DNR expects", () => {
+    const profile = profileWithFilters([]);
+    const redirect = createRedirectRule({
+      id: "redirect-capture",
+      name: "^https://old\\.example/(.*)$",
+      value: "https://new.example/$1/path",
+    });
+    const rule = compileProfileDnrRules(withRules(profile, { redirects: [redirect] })).rules.find(
+      (candidate) => candidate.action.type === "redirect",
+    );
+
+    expect(rule?.action.redirect?.regexSubstitution).toBe("https://new.example/\\1/path");
+  });
+
+  it("keeps an already escaped $1 literal", () => {
+    const profile = profileWithFilters([]);
+    const redirect = createRedirectRule({
+      id: "redirect-literal",
+      name: "^https://old\\.example/",
+      value: "https://new.example/\\$1",
+    });
+    const rule = compileProfileDnrRules(withRules(profile, { redirects: [redirect] })).rules.find(
+      (candidate) => candidate.action.type === "redirect",
+    );
+
+    expect(rule?.action.redirect?.regexSubstitution).toBe("https://new.example/\\$1");
+  });
+
+  it("skips cookies that would break the cookie header syntax", () => {
+    const profile = withRules(profileWithFilters([]), {
+      cookies: [
+        createCookieRule({ id: "cookie-valid", name: "session", value: "abc" }),
+        createCookieRule({ id: "cookie-semicolon", name: "broken", value: "a; b" }),
+        createCookieRule({ id: "cookie-space", name: "spaced name", value: "abc" }),
+      ],
+    });
+    const rule = compileProfileDnrRules(profile).rules.find(
+      (candidate) =>
+        candidate.action.type === "modifyHeaders" &&
+        candidate.action.requestHeaders?.[0]?.header === "cookie",
+    );
+
+    expect(rule?.action.requestHeaders).toEqual([
+      { header: "cookie", operation: "set", value: "session=abc" },
     ]);
   });
 });

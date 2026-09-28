@@ -109,6 +109,19 @@ export function isProfile(value: unknown): value is Profile {
   return new Set(entityIds).size === entityIds.length;
 }
 
+/** Shared by the runtime document and the persisted state: both must agree on
+ * what a valid selection is, or a document accepted on read is rejected on
+ * write (and vice versa). */
+export function isValidProfileSelection(
+  profiles: Profile[],
+  selectedProfileId: string | null,
+): boolean {
+  const profileIds = profiles.map((profile) => profile.id);
+  if (new Set(profileIds).size !== profileIds.length) return false;
+  if (profiles.length === 0) return selectedProfileId === null;
+  return selectedProfileId !== null && profileIds.includes(selectedProfileId);
+}
+
 export function isProfileState(value: unknown): value is ProfileState {
   if (
     !isRecord(value) ||
@@ -119,11 +132,7 @@ export function isProfileState(value: unknown): value is ProfileState {
     return false;
   }
 
-  const profiles = value.profiles;
-  const profileIds = profiles.map((profile) => profile.id);
-  if (new Set(profileIds).size !== profileIds.length) return false;
-  if (profiles.length === 0) return value.selectedProfileId === null;
-  return value.selectedProfileId !== null && profileIds.includes(value.selectedProfileId);
+  return isValidProfileSelection(value.profiles, value.selectedProfileId);
 }
 
 export function isProfileDocument(value: unknown): value is ProfileDocument {

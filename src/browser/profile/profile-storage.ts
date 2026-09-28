@@ -8,6 +8,7 @@ import {
   isPersistedProfileState,
   toPersistedState,
 } from "../../types/profile/profile-persistence";
+import { createProfileError } from "../../types/profile/profile-error";
 import { isProfileDocument } from "../../types/profile/profile-validation";
 import type { PersistedProfileState } from "../../types/profile/profile-model";
 
@@ -50,7 +51,9 @@ function isPersistedProfileDocument(value: unknown): value is PersistedProfileDo
 export async function readStoredProfileDocument(): Promise<ProfileDocument> {
   const persisted = await profileStateStorage.getValue();
   if (!isPersistedProfileDocument(persisted)) {
-    throw new Error("Invalid profile storage document");
+    throw Object.assign(new Error("Invalid profile storage document"), {
+      profileError: createProfileError("invalidStorageDocument"),
+    });
   }
   const state = fromPersistedState(persisted.state);
   return {

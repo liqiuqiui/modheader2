@@ -22,6 +22,28 @@ function emptyProfile(): Profile {
 }
 
 describe("Profile filter array operations", () => {
+  it("trims a patched comment like every other entry point", () => {
+    const filter = createProfileFilter({ id: "filter-1", kind: "urlPattern" });
+    const profile = addProfileFilter(emptyProfile(), filter);
+    const patched = patchProfileFilter(profile, filter.id, filter.kind, { comment: "  spaced  " });
+
+    expect(patched.filters[0]?.comment).toBe("spaced");
+  });
+
+  it("sorts numeric filter values as numbers", () => {
+    const profile = [1000, 999, 1200].reduce(
+      (current, value, index) =>
+        addProfileFilter(current, {
+          ...createProfileFilter({ id: `time-${index}`, kind: "time" }),
+          value,
+        }),
+      emptyProfile(),
+    );
+    const sorted = sortProfileFilters(profile).filters.map((filter) => filter.value);
+
+    expect(sorted).toEqual([999, 1000, 1200]);
+  });
+
   it("adds, patches and deletes an entity in array order", () => {
     const filter = createProfileFilter({
       id: "filter-1",

@@ -24,7 +24,7 @@ function applyFilterPatch(
   if (expectedKind === filter.kind && isFilterValue(filter.kind, patch.value)) {
     sanitized.value = patch.value;
   }
-  if (typeof patch.comment === "string") sanitized.comment = patch.comment;
+  if (typeof patch.comment === "string") sanitized.comment = patch.comment.trim();
 
   if (
     Object.keys(sanitized).length === 0 ||
@@ -124,11 +124,21 @@ function filterSortGroup(filter: ProfileFilter): number {
   return 5;
 }
 
+/** Numeric values (tab, tab group, window, time) compare as numbers; anything
+ * else compares as text, so "1000" never sorts before "999". */
+function compareFilterValues(left: ProfileFilter, right: ProfileFilter): number {
+  if (typeof left.value === "number" && typeof right.value === "number") {
+    return left.value - right.value;
+  }
+  return String(left.value).localeCompare(String(right.value));
+}
+
 export function sortProfileFilters(profile: Profile): Profile {
   const filters = [...profile.filters].sort(
     (left, right) =>
       filterSortGroup(left) - filterSortGroup(right) ||
-      String(left.value).localeCompare(String(right.value)),
+      left.kind.localeCompare(right.kind) ||
+      compareFilterValues(left, right),
   );
   const unchanged = filters.every((filter, index) => profile.filters[index]?.id === filter.id);
   return unchanged ? profile : { ...profile, filters };

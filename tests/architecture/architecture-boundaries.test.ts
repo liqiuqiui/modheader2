@@ -15,7 +15,10 @@ function sourceFiles(directory: string): string[] {
 
 describe("architecture boundaries", () => {
   it("does not reintroduce legacy profile layer names or store imports", () => {
-    const files = [...sourceFiles(join(process.cwd(), "src"))];
+    const files = [
+      ...sourceFiles(join(process.cwd(), "src")),
+      ...sourceFiles(join(process.cwd(), "entrypoints")),
+    ];
     const violations = files
       .filter((file) => !file.endsWith("architecture-boundaries.test.ts"))
       .flatMap((file) => {

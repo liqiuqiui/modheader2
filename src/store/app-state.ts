@@ -3,6 +3,7 @@ import {
   type ProfileDocument,
   type ProfileState,
 } from "../types/profile/profile-document";
+import type { ProfileError } from "../types/profile/profile-error";
 
 export interface ProfileDataState extends ProfileState {
   revision: number;
@@ -23,6 +24,9 @@ export interface ProfileHistoryState {
   future: ProfileState[];
 }
 
+/** Shared by the store and the undo/redo actions so the limit cannot drift. */
+export const HISTORY_LIMIT = 50;
+
 export const initialProfileHistoryState: ProfileHistoryState = {
   past: [],
   future: [],
@@ -32,7 +36,7 @@ export type ProfileSyncStatus = "idle" | "loading" | "ready" | "error";
 
 export interface ProfileSyncState {
   status: ProfileSyncStatus;
-  error: string | null;
+  error: ProfileError | null;
 }
 
 export const initialProfileSyncState: ProfileSyncState = {

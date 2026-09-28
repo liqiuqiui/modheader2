@@ -190,8 +190,40 @@ describe("profile store synchronization", () => {
     expect(appStore.getState()).toMatchObject({
       revision: 1,
       profiles: [original],
-      error: "storage unavailable",
+      error: { code: "commandRejected", message: "storage unavailable" },
     });
+    expect(appStore.getState().past).toEqual([]);
+  });
+
+  it("drops the undo history when another editor writes, so undo cannot revert it", async () => {
+    const original = createProfile({
+      id: "profile-original",
+      title: "Original",
+      backgroundColor: "#2563eb",
+    });
+    const renamed = { ...original, title: "Renamed" };
+    const external = createProfile({
+      id: "profile-external",
+      title: "External",
+      backgroundColor: "#0f766e",
+    });
+    mocks.enqueueProfileCommand
+      .mockResolvedValueOnce(createInitialProfileDocument(original, "client-test", 1))
+      .mockResolvedValueOnce(createInitialProfileDocument(renamed, "client-test", 2));
+
+    const { appStore } = await import("./app-store");
+    await appStore.getState().initialize("zh-CN");
+    await expect(appStore.getState().patchProfile(original.id, { title: "Renamed" })).resolves.toBe(
+      true,
+    );
+    expect(appStore.getState().past).toHaveLength(1);
+
+    // Another surface of this extension (another popup, or the context menu):
+    // an undo replays a whole-state snapshot and would revert this write.
+    mocks.emitStorageDocument(
+      createInitialProfileDocument(external, "modheader-client-background-1", 3),
+    );
+    await vi.waitFor(() => expect(appStore.getState().revision).toBe(3));
     expect(appStore.getState().past).toEqual([]);
   });
 });

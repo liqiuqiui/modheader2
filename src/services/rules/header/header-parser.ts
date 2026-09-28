@@ -1,4 +1,6 @@
+import { isNonEmptyString } from "../../../types/profile/profile-guards";
 import type { HeaderRule } from "../../../types/profile/profile-model";
+import { isHeaderRule } from "../../../types/profile/profile-validation";
 
 export function normalizeHeaderRule(rule: HeaderRule): HeaderRule {
   return {
@@ -10,20 +12,7 @@ export function normalizeHeaderRule(rule: HeaderRule): HeaderRule {
 }
 
 export function parseHeaderRule(input: unknown): HeaderRule | null {
-  if (!input || typeof input !== "object") return null;
-  const value = input as Partial<HeaderRule>;
-  if (
-    typeof value.id !== "string" ||
-    typeof value.enabled !== "boolean" ||
-    typeof value.name !== "string" ||
-    typeof value.value !== "string" ||
-    typeof value.comment !== "string" ||
-    (value.appendMode !== "override" &&
-      value.appendMode !== "append" &&
-      value.appendMode !== "comma") ||
-    typeof value.sendEmptyHeader !== "boolean"
-  ) {
-    return null;
-  }
-  return normalizeHeaderRule(value as HeaderRule);
+  if (!isHeaderRule(input)) return null;
+  if (!isNonEmptyString(input.id)) return null;
+  return normalizeHeaderRule(input);
 }

@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { browser } from "wxt/browser";
 import type { ProfileCommand } from "../../services/profile/profile-command";
 import type { ProfileDocument } from "../../types/profile/profile-document";
+import type { ProfileErrorPayload } from "../../types/profile/profile-error";
 import {
   parseProfileCommandResponse,
   PROFILE_COMMAND_CHANNEL,
@@ -25,6 +26,24 @@ type ProfileCommandRequestOutcome =
   | { status: "fulfilled"; response: unknown }
   | { status: "rejected"; error: unknown };
 
+/** Source ids are namespaced (and scoped) so a write can be traced back to the
+ * surface that produced it when debugging a revision conflict. */
+const PROFILE_SOURCE_ID_PREFIX = "modheader-client";
+
+export function createProfileSourceId(scope = "client"): string {
+  return `${PROFILE_SOURCE_ID_PREFIX}-${scope}-${nanoid()}`;
+}
+
+export class ProfileCommandError extends Error {
+  readonly profileError: ProfileErrorPayload;
+
+  constructor(message: string, payload: ProfileErrorPayload) {
+    super(message);
+    this.name = "ProfileCommandError";
+    this.profileError = payload;
+  }
+}
+
 function resolveProfileCommandResponse(
   outcomePromise: Promise<ProfileCommandRequestOutcome>,
 ): Promise<ProfileDocument> {
@@ -33,9 +52,16 @@ function resolveProfileCommandResponse(
 
     const response = parseProfileCommandResponse(outcome.response);
     if (!response) {
-      throw new Error("Invalid response from profile background");
+      throw new ProfileCommandError("Invalid response from profile background", {
+        code: "invalidResponse",
+      });
     }
-    if (!response.ok) throw new Error(response.error);
+    if (!response.ok) {
+      throw new ProfileCommandError(response.error, {
+        code: response.code ?? "commandRejected",
+        params: response.params,
+      });
+    }
     return response.document;
   });
 }
@@ -57,7 +83,10 @@ function settleProfileCommandRequest(
       () =>
         finish({
           status: "rejected",
-          error: new Error(`Profile command timed out after ${timeoutMs}ms`),
+          error: new ProfileCommandError(`Profile command timed out after ${timeoutMs}ms`, {
+            code: "commandTimeout",
+            params: { timeoutMs },
+          }),
         }),
       timeoutMs,
     );
@@ -69,7 +98,7 @@ function settleProfileCommandRequest(
 }
 
 export function createProfileCommandClient({
-  clientId = nanoid(),
+  clientId = createProfileSourceId(),
   requestTimeoutMs = DEFAULT_PROFILE_COMMAND_TIMEOUT_MS,
   sendMessage,
 }: ProfileCommandClientOptions): ProfileCommandClient {

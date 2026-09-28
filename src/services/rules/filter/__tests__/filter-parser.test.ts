@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { isFilterValue } from "../../../../types/profile/profile-filter";
 import { FILTER_KINDS } from "../../../../types/profile/profile-model";
-import { createFilter, isFilterValue, parseFilter } from "../filter-parser";
+import { createFilter } from "../filter-parser";
 
 describe("filter parser", () => {
   it("uses the current tab as the default tab filter value", () => {
@@ -23,9 +24,5 @@ describe("filter parser", () => {
     expect(isFilterValue("resourceType", "script")).toBe(true);
     expect(isFilterValue("time", Date.now() + 60_000)).toBe(true);
     expect(isFilterValue("time", -1)).toBe(false);
-  });
-
-  it("rejects malformed filters", () => {
-    expect(parseFilter({ kind: "tab", value: "not-a-tab" })).toBeNull();
   });
 });

@@ -1,8 +1,8 @@
-import { nanoid } from "nanoid";
 import { defineBackground } from "wxt/utils/define-background";
 import i18n, { initializeI18n } from "../src/i18n";
 import { localeStorage } from "../src/i18n/locale-storage";
 import type { ProfileCommand } from "../src/services/profile/profile-command";
+import type { Profile } from "../src/types/profile/profile-model";
 import {
   isProfileCommandRevisionConflict,
   reduceProfileCommand,
@@ -13,10 +13,13 @@ import {
   nextProfileTimeFilterExpiration,
 } from "../src/browser/profile/profile-dnr";
 import { profileActionBadgeController } from "../src/browser/profile/profile-action-badge";
+import { createProfileSourceId } from "../src/browser/profile/profile-command-client";
 import {
   isProfileCommandMessage,
   type ProfileCommandResponse,
 } from "../src/browser/profile/profile-command-protocol";
+import { createProfileError } from "../src/types/profile/profile-error";
+import type { ProfileErrorPayload } from "../src/types/profile/profile-error";
 import {
   readStoredProfileDocument,
   type ProfileDocument,
@@ -30,13 +33,27 @@ import {
 
 const CONTEXT_MENU_ID = "toggle_pause";
 const TIME_FILTER_ALARM = "checkTimeFilterAlarm";
-const BACKGROUND_SOURCE_ID = nanoid();
+const BACKGROUND_SOURCE_ID = createProfileSourceId("background");
 
 function selectedProfile(document: ProfileDocument) {
   const profileId = document.state.selectedProfileId;
   return profileId
     ? document.state.profiles.find((profile) => profile.id === profileId)
     : undefined;
+}
+
+/** Refreshing the alarm must survive a failed DNR sync: a missed refresh would
+ * leave every "expire at" filter dormant until some unrelated event fires. */
+async function scheduleTimeFilterAlarm(profile: Profile | undefined): Promise<void> {
+  try {
+    await browser.alarms.clear(TIME_FILTER_ALARM);
+    const expiration = nextProfileTimeFilterExpiration(profile);
+    if (expiration !== null) {
+      await browser.alarms.create(TIME_FILTER_ALARM, { when: expiration });
+    }
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 async function syncRules() {
@@ -52,14 +69,11 @@ async function syncRules() {
     await applyDnrRules(compilation.rules);
   } catch (error) {
     await profileActionBadgeController.sync(profile, []).catch(console.error);
+    await scheduleTimeFilterAlarm(profile);
     throw error;
   }
   await profileActionBadgeController.sync(profile, compilation.rules);
-  await browser.alarms.clear(TIME_FILTER_ALARM);
-  const expiration = nextProfileTimeFilterExpiration(profile);
-  if (expiration !== null) {
-    await browser.alarms.create(TIME_FILTER_ALARM, { when: expiration });
-  }
+  await scheduleTimeFilterAlarm(profile);
 }
 
 async function syncContextMenu() {
@@ -89,8 +103,16 @@ function executeProfileCommand(
     const current = await readStoredProfileDocument();
     const result = reduceProfileCommand(current, command, sourceId);
     if (isProfileCommandRevisionConflict(result)) {
-      throw new Error(
-        `Profile state changed in another window (expected revision ${result.expected}, current revision ${result.actual}).`,
+      throw Object.assign(
+        new Error(
+          `Profile state changed in another window (expected revision ${result.expected}, current revision ${result.actual}).`,
+        ),
+        {
+          profileError: createProfileError("revisionConflict", {
+            expected: result.expected,
+            current: result.actual,
+          }),
+        },
       );
     }
     if (result.status === "applied") await writeStoredProfileDocument(result.document);
@@ -105,7 +127,12 @@ async function handleProfileCommand(
   try {
     return { ok: true, document: await executeProfileCommand(command, sourceId) };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    const payload = (error as { profileError?: ProfileErrorPayload }).profileError;
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      ...payload,
+    };
   }
 }
 

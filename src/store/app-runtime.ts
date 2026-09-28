@@ -5,13 +5,17 @@ import {
   PROFILE_COMMAND_CLIENT_ID,
 } from "../browser/profile/profile-command-client";
 import type { ProfileDocument } from "../types/profile/profile-document";
+import {
+  toProfileError as convertToProfileError,
+  type ProfileError,
+} from "../types/profile/profile-error";
 import type { Profile } from "../types/profile/profile-model";
 import type { ProfileCommand } from "../services/profile/profile-command";
 import type { AppStoreState } from "./app-store-contract";
 
 export interface AppRuntime {
   initializationPromise: Promise<void> | null;
-  stopWatchingStorage: (() => void) | null;
+  watchingStorage: boolean;
   pendingCommands: number;
   deferredDocument: ProfileDocument | null;
   authoritativeDocument: ProfileDocument | null;
@@ -27,7 +31,7 @@ export interface AppRuntime {
 export function createAppRuntime(): AppRuntime {
   return {
     initializationPromise: null,
-    stopWatchingStorage: null,
+    watchingStorage: false,
     pendingCommands: 0,
     deferredDocument: null,
     authoritativeDocument: null,
@@ -58,13 +62,13 @@ export function rememberDeferredDocument(runtime: AppRuntime, document: ProfileD
   }
 }
 
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+export function toProfileError(error: unknown): ProfileError {
+  return convertToProfileError(error, "commandRejected");
 }
 
 type ApplyDocument = (
   document: ProfileDocument,
-  options: { clearHistory: boolean; error?: string | null },
+  options: { clearHistory: boolean; error?: ProfileError | null },
 ) => void;
 
 interface ProfileCommandRuntimeContext {
@@ -97,7 +101,7 @@ export function createProfileCommandDispatcher(context: ProfileCommandRuntimeCon
       return true;
     } catch (error) {
       runtime.commandFailed = true;
-      set({ error: errorMessage(error) });
+      set({ error: toProfileError(error) });
       return false;
     } finally {
       runtime.pendingCommands -= 1;
@@ -105,11 +109,11 @@ export function createProfileCommandDispatcher(context: ProfileCommandRuntimeCon
         try {
           if (!runtime.storageResetPending) await synchronizeAfterCommands();
         } catch (synchronizationError) {
-          const message = errorMessage(synchronizationError);
+          const failure = toProfileError(synchronizationError);
           if (runtime.authoritativeDocument) {
-            applyDocument(runtime.authoritativeDocument, { clearHistory: true, error: message });
+            applyDocument(runtime.authoritativeDocument, { clearHistory: true, error: failure });
           } else {
-            set({ status: "error", error: message });
+            set({ status: "error", error: failure });
           }
         } finally {
           resolveCommandSettlementWaiters(runtime);
@@ -157,14 +161,16 @@ export function createProfileStorageWatcher(context: ProfileStorageRuntimeContex
     }
 
     if (document.revision < runtime.lastAuthoritativeRevision) return;
+    // Undo replays a whole-state snapshot, so a stack recorded before another
+    // editor (another popup/options page, the context menu, an import) wrote
+    // would roll that write back. Only this client's own writes keep history.
+    const ownWrite = document.sourceId === PROFILE_COMMAND_CLIENT_ID;
     if (runtime.pendingCommands > 0) {
-      if (document.sourceId !== PROFILE_COMMAND_CLIENT_ID) runtime.sawExternalChange = true;
+      if (!ownWrite) runtime.sawExternalChange = true;
       rememberDeferredDocument(runtime, document);
       return;
     }
-    applyDocument(document, {
-      clearHistory: document.sourceId !== PROFILE_COMMAND_CLIENT_ID,
-    });
+    applyDocument(document, { clearHistory: !ownWrite });
     if (runtime.storageResetPending && !runtime.initializationPromise) {
       runtime.storageResetPending = false;
     }
@@ -204,7 +210,7 @@ export function createProfileInitializer(context: ProfileInitializationContext) 
           applyDocument(runtime.authoritativeDocument, { clearHistory: true });
           return;
         }
-        set({ status: "error", error: errorMessage(error) });
+        set({ status: "error", error: toProfileError(error) });
       })
       .finally(() => {
         runtime.initializationPromise = null;

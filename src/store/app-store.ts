@@ -6,6 +6,7 @@ import i18n from "../i18n";
 import type { ProfileCommand } from "../services/profile/profile-command";
 import { reduceProfileCommand } from "../services/profile/reduce-profile-command";
 import { type ProfileDocument, type ProfileState } from "../types/profile/profile-document";
+import { createProfileError, type ProfileError } from "../types/profile/profile-error";
 import { createProfile } from "../types/profile/profile-factory";
 import type { Profile } from "../types/profile/profile-model";
 import type { BrowserTab, BrowserTabGroup } from "../types/browser";
@@ -17,6 +18,7 @@ import {
   watchStoredProfileDocument,
 } from "../browser/profile/profile-storage";
 import {
+  HISTORY_LIMIT,
   initialProfileDataState,
   profileDataFromDocument,
   initialProfileHistoryState,
@@ -33,8 +35,6 @@ import {
   rememberDeferredDocument,
 } from "./app-runtime";
 import { createAppActions } from "./app-actions";
-
-const HISTORY_LIMIT = 50;
 
 function sortBrowserTabs(tabs: BrowserTab[], currentTabId?: number) {
   return [...tabs].sort(
@@ -177,7 +177,7 @@ export const appStore = createStore<AppStoreState>()((set, get) => {
   const runtime = createAppRuntime();
   const applyDocument = (
     document: ProfileDocument,
-    options: { clearHistory: boolean; error?: string | null },
+    options: { clearHistory: boolean; error?: ProfileError | null },
   ) => {
     runtime.authoritativeDocument = document;
     runtime.lastAuthoritativeRevision = Math.max(
@@ -234,7 +234,11 @@ export const appStore = createStore<AppStoreState>()((set, get) => {
     const result = reduceProfileCommand(currentDocument, command, PROFILE_COMMAND_CLIENT_ID);
     if (result.status === "revision-conflict") {
       set({
-        error: `Profile revision conflict: expected ${result.expected}, received ${result.actual}`,
+        error: createProfileError(
+          "revisionConflict",
+          { expected: result.expected, current: result.actual },
+          `Profile revision conflict: expected ${result.expected}, received ${result.actual}`,
+        ),
       });
       return false;
     }
@@ -335,11 +339,13 @@ export const appStore = createStore<AppStoreState>()((set, get) => {
     },
     requestFocus: (kind, id) => set({ focusRequest: { kind, id } }),
     clearFocusRequest: () => set({ focusRequest: null }),
+    clearError: () => set({ error: null }),
 
     initialize: async (locale) => {
       runtime.currentLocale = locale;
-      if (!runtime.stopWatchingStorage) {
-        runtime.stopWatchingStorage = watchStoredProfileDocument(handleStoredProfileDocument);
+      if (!runtime.watchingStorage) {
+        watchStoredProfileDocument(handleStoredProfileDocument);
+        runtime.watchingStorage = true;
       }
       if (get().status === "ready") return;
 

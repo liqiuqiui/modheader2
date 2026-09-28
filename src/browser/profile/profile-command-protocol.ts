@@ -1,7 +1,13 @@
 import type { ProfileCommand } from "../../services/profile/profile-command";
 import { isProfileBackgroundColor } from "../../types/profile/profile-appearance";
 import type { ProfileDocument } from "../../types/profile/profile-document";
-import { isFilterKind, isFilterMode, isProfileFilter } from "../../types/profile/profile-filter";
+import { isProfileErrorPayload, type ProfileErrorPayload } from "../../types/profile/profile-error";
+import {
+  isFilterKind,
+  isFilterMode,
+  isFilterValue,
+  isProfileFilter,
+} from "../../types/profile/profile-filter";
 import {
   hasExactKeys,
   hasOnlyKeys,
@@ -12,7 +18,7 @@ import {
   isProfileRuleCollection,
   isRecord,
 } from "../../types/profile/profile-guards";
-import type { ProfileRuleCollection } from "../../types/profile/profile-model";
+import type { FilterKind, ProfileRuleCollection } from "../../types/profile/profile-model";
 import {
   isCspRule,
   isHeaderRule,
@@ -32,14 +38,30 @@ export interface ProfileCommandMessage {
 
 export type ProfileCommandResponse =
   | { ok: true; document: ProfileDocument }
-  | { ok: false; error: string };
+  | ({ ok: false; error: string } & Partial<ProfileErrorPayload>);
 
+/** Kept in sync with `applyProfileMetadataPatch`: a field the reducer accepts
+ * but the protocol rejects would be silently dropped. */
 function isProfileMetadataPatch(value: unknown): boolean {
-  if (!isRecord(value) || !hasOnlyKeys(value, ["title", "backgroundColor", "enabled", "paused"])) {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, [
+      "title",
+      "shortTitle",
+      "textColor",
+      "hideComment",
+      "backgroundColor",
+      "enabled",
+      "paused",
+    ])
+  ) {
     return false;
   }
   return (
     (value.title === undefined || typeof value.title === "string") &&
+    (value.shortTitle === undefined || typeof value.shortTitle === "string") &&
+    (value.textColor === undefined || typeof value.textColor === "string") &&
+    (value.hideComment === undefined || typeof value.hideComment === "boolean") &&
     (value.backgroundColor === undefined || isProfileBackgroundColor(value.backgroundColor)) &&
     (value.enabled === undefined || typeof value.enabled === "boolean") &&
     (value.paused === undefined || typeof value.paused === "boolean")
@@ -83,19 +105,17 @@ function isProfileRulePatch(collection: ProfileRuleCollection, value: unknown): 
   );
 }
 
-function isProfileFilterPatch(value: unknown): boolean {
+/** Validated against the expected kind: the reducer re-checks the value with
+ * `isFilterValue(filter.kind, ...)`, so an unvalidated value would be silently
+ * dropped there while the command still reports success. */
+function isProfileFilterPatch(kind: FilterKind, value: unknown): boolean {
   if (!isRecord(value) || !hasOnlyKeys(value, ["enabled", "mode", "value", "comment"])) {
     return false;
   }
-  const validValue =
-    value.value === undefined ||
-    value.value === null ||
-    typeof value.value === "string" ||
-    isNonNegativeInteger(value.value);
   return (
     (value.enabled === undefined || typeof value.enabled === "boolean") &&
     (value.mode === undefined || isFilterMode(value.mode)) &&
-    validValue &&
+    (value.value === undefined || isFilterValue(kind, value.value)) &&
     (value.comment === undefined || typeof value.comment === "string")
   );
 }
@@ -202,7 +222,7 @@ function isProfileCommand(value: unknown): value is ProfileCommand {
         isNonEmptyString(value.profileId) &&
         isNonEmptyString(value.filterId) &&
         isFilterKind(value.expectedKind) &&
-        isProfileFilterPatch(value.patch)
+        isProfileFilterPatch(value.expectedKind, value.patch)
       );
     case "changeFilterKind":
       return (
@@ -275,7 +295,14 @@ export function parseProfileCommandResponse(value: unknown): ProfileCommandRespo
       ? { ok: true, document: value.document }
       : null;
   }
-  return hasExactKeys(value, ["ok", "error"]) && typeof value.error === "string"
-    ? { ok: false, error: value.error }
-    : null;
+  if (
+    !hasExactKeys(value, ["ok", "error"]) &&
+    !hasOnlyKeys(value, ["ok", "error", "code", "params"])
+  ) {
+    return null;
+  }
+  if (typeof value.error !== "string") return null;
+  if (value.code === undefined) return { ok: false, error: value.error };
+  const payload = { code: value.code, params: value.params };
+  return isProfileErrorPayload(payload) ? { ok: false, error: value.error, ...payload } : null;
 }
