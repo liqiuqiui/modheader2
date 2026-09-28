@@ -112,15 +112,15 @@ export function FilterSection({
       handleAdd("tab");
       return;
     }
+    // A state updater must stay pure: calling other setters from inside it runs
+    // twice under StrictMode.
+    const next = !showAddPanel;
     setOpen(true);
-    setShowAddPanel((current) => {
-      const next = !current;
-      if (next) {
-        setDraftKind("tab");
-        setDraftMode("include");
-      }
-      return next;
-    });
+    setShowAddPanel(next);
+    if (next) {
+      setDraftKind("tab");
+      setDraftMode("include");
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {

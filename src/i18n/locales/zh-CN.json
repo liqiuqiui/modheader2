@@ -6,23 +6,18 @@
     "loading": "加载中…",
     "enabled": "已启用",
     "disabled": "已禁用",
-    "add": "添加",
-    "delete": "删除",
     "more": "更多操作",
     "current": "当前",
-    "planned": "规划中",
     "chinese": "中文",
     "english": "English",
     "language": "语言",
     "close": "关闭",
-    "noSearchResults": "没有匹配搜索条件的内容",
     "comment": "修改注释",
     "commentPlaceholder": "添加注释，说明这项修改的用途…",
     "addComment": "添加注释",
     "removeComment": "移除注释"
   },
   "profile": {
-    "label": "配置",
     "list": "配置列表",
     "add": "新增配置",
     "rename": "重命名",
@@ -57,12 +52,9 @@
     "redo": "重做",
     "pause": "暂停当前配置",
     "resume": "恢复当前配置",
-    "settings": "设置",
     "profileMenu": "配置菜单",
-    "addModification": "添加修改",
     "newProfile": "新增配置",
     "expand": "在新标签页打开",
-    "paused": "当前配置已暂停",
     "pausedBadge": "暂停中"
   },
   "section": {
@@ -78,7 +70,6 @@
     "more": "{{title}} 更多操作",
     "clear": "清空该分组",
     "noRules": "还没有 {{title}}",
-    "noRulesShort": "暂无规则",
     "noMatchedRules": "没有匹配搜索条件的规则"
   },
   "header": {
@@ -108,12 +99,9 @@
     "directivePlaceholder": "指令（如 script-src…）",
     "value": "指令值",
     "valuePlaceholder": "指令值",
-    "enable": "启用 CSP 指令",
     "enableRule": "启用 CSP 指令 {{directive}}",
     "disableRule": "禁用 CSP 指令 {{directive}}",
-    "delete": "删除 CSP 指令",
     "deleteRule": "删除 CSP 指令 {{directive}}",
-    "more": "CSP 指令更多操作",
     "moreRule": "CSP 指令 {{directive}} 的更多操作",
     "ruleLabel": "CSP 指令 {{directive}}",
     "unnamed": "未命名",
@@ -145,9 +133,6 @@
     "noFilters": "还没有过滤条件，当前修改会作用到全部请求",
     "noMatched": "没有匹配搜索条件的过滤器",
     "help": "包含条件限制规则的作用范围；排除条件优先，用于跳过匹配请求。",
-    "urlIncludeHint": "只有匹配正则的 URL 才会应用规则",
-    "urlExcludeHint": "匹配正则的 URL 会被排除",
-    "tabHint": "仅对选中的浏览器 Tab 应用规则",
     "tabGroupPlaceholder": "选择 Tab 组",
     "windowPlaceholder": "选择窗口",
     "tabGroupUntitled_other": "未命名组（{{count}} 个标签）",
@@ -230,6 +215,13 @@
     "success": "已导入 {{count}} 个配置",
     "failed": "导入失败：{{message}}",
     "invalid": "文件格式不正确"
+  },
+  "errors": {
+    "revisionConflict": "配置已在其他窗口被修改（期望版本 {{expected}}，实际 {{current}}），请重试",
+    "commandTimeout": "操作超时（{{timeoutMs}} 毫秒），请重试",
+    "invalidResponse": "后台返回了无效的响应",
+    "invalidStorageDocument": "本地保存的配置已损坏",
+    "commandRejected": "操作未生效"
   },
   "sort": {
     "success": "当前规则已排序"

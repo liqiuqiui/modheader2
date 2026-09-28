@@ -32,6 +32,7 @@ import {
 } from "../../../../components/ui/select";
 import { Switch } from "../../../../components/ui/switch";
 import { useTranslation } from "react-i18next";
+import { useAutoFocusOnce } from "../shared/use-auto-focus-once";
 
 const EMPTY_NAME_SUGGESTIONS: readonly string[] = [];
 
@@ -43,7 +44,6 @@ interface HeaderRuleRowProps {
   onConvert?: (ruleId: string) => void;
   convertLabel?: string;
   autoFocus?: boolean;
-  searchQuery?: string;
   compact?: boolean;
   nameSuggestions?: readonly string[];
 }
@@ -67,6 +67,7 @@ function HeaderRuleRowComponent({
   const [revealed, setRevealed] = useState(false);
   const [showComment, setShowComment] = useState(Boolean(rule.comment));
   const commentRef = useRef<HTMLInputElement>(null);
+  const shouldAutoFocus = useAutoFocusOnce(Boolean(autoFocus));
   const sensitive = useMemo(() => isSensitiveHeader(rule.name), [rule.name]);
   const selectedNameSuggestion = useMemo(() => {
     const normalizedName = rule.name.trim().toLowerCase();
@@ -123,7 +124,7 @@ function HeaderRuleRowComponent({
             aria-label={t("header.name")}
             className="h-8 min-w-0 flex-[0.85] border-slate-200 bg-slate-50 shadow-none focus-within:bg-white [&_[data-slot=input-group-control]]:font-mono"
             placeholder={t("header.namePlaceholder")}
-            autoFocus={autoFocus && !rule.name}
+            autoFocus={shouldAutoFocus && !rule.name}
             spellCheck={false}
           />
           <ComboboxContent sideOffset={4}>
@@ -148,7 +149,7 @@ function HeaderRuleRowComponent({
             className="h-8 border-slate-200 bg-slate-50 pr-9 font-mono text-xs font-normal shadow-none focus-visible:bg-white"
             placeholder={t("header.valuePlaceholder")}
             value={rule.value}
-            autoFocus={autoFocus && Boolean(rule.name)}
+            autoFocus={shouldAutoFocus && Boolean(rule.name)}
             onChange={(event) => onChange(rule.id, { value: event.target.value })}
             spellCheck={false}
           />

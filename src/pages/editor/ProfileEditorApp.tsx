@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import { ThemePortalProvider } from "../../components/ThemePortalProvider";
@@ -20,12 +20,13 @@ import {
   parseImportedProfiles,
 } from "./actions/profile-transfer-actions";
 import { closePopup, openOptionsPage } from "./browser/runtime-service";
+import { translateProfileError } from "./profile-error-message";
 
 export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage === "en" ? "en" : "zh-CN";
   const controller = useEditorController();
-  const { profile, actions, status, error, notice, canUndo: _canUndo } = controller;
+  const { profile, actions, status, error, notice } = controller;
   const { titleRef, renameRequestedRef, fileInputRef, colorInputRef, colorTargetProfileIdRef } =
     useEditorRuntime(locale, mode);
   const showNotice = (message: string) => appStore.getState().showNotice(message);
@@ -33,6 +34,14 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
   const hasProfile = Boolean(profile);
   const themeColor = profile?.backgroundColor;
   const profilePaused = profile?.paused ?? false;
+  const errorMessage = translateProfileError(error, t);
+  const focusFrameRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (focusFrameRef.current !== null) window.cancelAnimationFrame(focusFrameRef.current);
+    },
+    [],
+  );
 
   const requestTitleRename = () => {
     renameRequestedRef.current = true;
@@ -58,7 +67,8 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
     if (!renameRequestedRef.current) return;
     event.preventDefault();
     renameRequestedRef.current = false;
-    window.requestAnimationFrame(() => {
+    focusFrameRef.current = window.requestAnimationFrame(() => {
+      focusFrameRef.current = null;
       const input = titleRef.current;
       if (!input) return;
       input.focus();
@@ -88,7 +98,7 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
       if (profiles.length === 0) throw new Error(t("import.empty"));
       const count = await actions.importProfiles(profiles);
       if (count === 0) {
-        throw new Error(controller.error ?? t("import.invalid"));
+        throw new Error(errorMessage || t("import.invalid"));
       }
       showNotice(t("import.success", { count }));
     } catch (importError) {
@@ -118,7 +128,7 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
   if (status === "error") {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50 px-6 text-center text-sm text-rose-600">
-        {error ?? t("import.invalid")}
+        {errorMessage || t("import.invalid")}
       </div>
     );
   }
@@ -193,7 +203,11 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
           onImport={(file) => void handleImport(file)}
           onColorChange={handleColorChange}
         />
-        <NoticeToast message={error ?? notice} />
+        <NoticeToast
+          message={errorMessage || notice}
+          dismissible={Boolean(error)}
+          onDismiss={() => appStore.getState().clearError()}
+        />
       </div>
     </ThemePortalProvider>
   );

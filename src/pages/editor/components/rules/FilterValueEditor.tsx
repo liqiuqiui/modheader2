@@ -6,6 +6,7 @@ import type { BrowserTab, BrowserTabGroup } from "../../../../types/browser";
 import { FILTER_LABEL_KEYS, METHODS, RESOURCE_TYPES } from "../../constants";
 import { FilterSelect, type FilterSelectOption } from "./FilterSelect";
 import { filterSelectTextClass } from "../shared/styles";
+import { useAutoFocusOnce } from "../shared/use-auto-focus-once";
 
 // Colours mirror the swatches Chrome paints on tab groups, so a group without a
 // title is still recognisable next to the browser UI.
@@ -54,6 +55,7 @@ export function FilterValueEditor({
   autoFocus?: boolean;
 }) {
   const { t } = useTranslation();
+  const shouldAutoFocus = useAutoFocusOnce(Boolean(autoFocus));
   // Same resolution as the filter section: the popup's tab, otherwise the
   // active tab of the window the popup was opened in.
   const currentTab = tabs.find((tab) => tab.id === currentTabId) ?? tabs.find((tab) => tab.active);
@@ -173,7 +175,7 @@ export function FilterValueEditor({
       <FilterSelect
         ariaLabel={t("filter.resourceTypeLabel")}
         value={filter.value}
-        autoFocus={autoFocus}
+        autoFocus={shouldAutoFocus}
         onValueChange={onChange}
         className="min-w-0 flex-1"
         itemClassName={filterSelectTextClass}

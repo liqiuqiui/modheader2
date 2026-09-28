@@ -7,6 +7,7 @@ import { Input } from "../../../../components/ui/input";
 import { Switch } from "../../../../components/ui/switch";
 import type { NameValueRule } from "../../../../types/profile/profile-model";
 import { menuItemClass } from "../shared/styles";
+import { useAutoFocusOnce } from "../shared/use-auto-focus-once";
 
 function CookieRuleRowComponent({
   cookie,
@@ -26,6 +27,7 @@ function CookieRuleRowComponent({
   const { t } = useTranslation();
   const [showComment, setShowComment] = useState(Boolean(cookie.comment));
   const commentRef = useRef<HTMLInputElement>(null);
+  const shouldAutoFocus = useAutoFocusOnce(autoFocus);
   const commentVisible = showComment || Boolean(cookie.comment);
 
   return (
@@ -48,7 +50,7 @@ function CookieRuleRowComponent({
           className="h-8 min-w-0 flex-[0.85] rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-normal outline-none transition hover:bg-white focus:ring-2 focus:ring-[var(--theme-color)]"
           placeholder={t("cookie.namePlaceholder")}
           value={cookie.name}
-          autoFocus={autoFocus}
+          autoFocus={shouldAutoFocus}
           onChange={(event) => onChange(cookie.id, { name: event.target.value })}
           spellCheck={false}
         />

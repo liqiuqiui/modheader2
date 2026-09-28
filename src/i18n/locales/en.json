@@ -6,23 +6,18 @@
     "loading": "Loading…",
     "enabled": "Enabled",
     "disabled": "Disabled",
-    "add": "Add",
-    "delete": "Delete",
     "more": "More actions",
     "current": "Current",
-    "planned": "Planned",
     "chinese": "中文",
     "english": "English",
     "language": "Language",
     "close": "Close",
-    "noSearchResults": "No matching results",
     "comment": "Modification comment",
     "commentPlaceholder": "Add a comment describing this modification…",
     "addComment": "Add comment",
     "removeComment": "Remove comment"
   },
   "profile": {
-    "label": "Profile",
     "list": "Profiles",
     "add": "New profile",
     "rename": "Rename",
@@ -57,12 +52,9 @@
     "redo": "Redo",
     "pause": "Pause current profile",
     "resume": "Resume current profile",
-    "settings": "Settings",
     "profileMenu": "Profile menu",
-    "addModification": "Add modification",
     "newProfile": "New profile",
     "expand": "Open in a tab",
-    "paused": "Current profile is paused",
     "pausedBadge": "PAUSED"
   },
   "section": {
@@ -78,7 +70,6 @@
     "more": "More {{title}} actions",
     "clear": "Clear this section",
     "noRules": "No {{title}} yet",
-    "noRulesShort": "No rules",
     "noMatchedRules": "No rules match your search"
   },
   "header": {
@@ -108,12 +99,9 @@
     "directivePlaceholder": "Directive (script-src…)",
     "value": "Directive value",
     "valuePlaceholder": "Directive value",
-    "enable": "Enable CSP directive",
     "enableRule": "Enable CSP directive {{directive}}",
     "disableRule": "Disable CSP directive {{directive}}",
-    "delete": "Delete CSP directive",
     "deleteRule": "Delete CSP directive {{directive}}",
-    "more": "More CSP directive actions",
     "moreRule": "More actions for CSP directive {{directive}}",
     "ruleLabel": "CSP directive {{directive}}",
     "unnamed": "unnamed",
@@ -145,9 +133,6 @@
     "noFilters": "No filters — modifications apply to every request",
     "noMatched": "No filters match your search",
     "help": "Include conditions limit the scope; Exclude conditions take priority and skip matching requests.",
-    "urlIncludeHint": "Rules only apply to URLs matching this regular expression",
-    "urlExcludeHint": "URLs matching this regular expression are excluded",
-    "tabHint": "Apply rules only to selected browser tabs",
     "tabGroupPlaceholder": "Select a tab group",
     "windowPlaceholder": "Select a window",
     "tabGroupUntitled_one": "Untitled group ({{count}} tab)",
@@ -232,6 +217,13 @@
     "success": "Imported {{count}} profiles",
     "failed": "Import failed: {{message}}",
     "invalid": "Invalid file format"
+  },
+  "errors": {
+    "revisionConflict": "The profile changed in another window (expected revision {{expected}}, current {{current}}). Please retry.",
+    "commandTimeout": "The operation timed out after {{timeoutMs}} ms. Please retry.",
+    "invalidResponse": "The background returned an invalid response",
+    "invalidStorageDocument": "The locally stored profile is corrupted",
+    "commandRejected": "The operation did not take effect"
   },
   "sort": {
     "success": "Current rules sorted"

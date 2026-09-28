@@ -11,7 +11,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { memo } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getProfileShortTitle,
@@ -21,6 +21,9 @@ import type { Profile } from "../../../../types/profile/profile-model";
 import { useEditorController } from "../../editor-controller";
 import { useAppStore } from "../../../../store/app-store";
 import type { EditorMode } from "../../types";
+
+const FEEDBACK_URL = "https://github.com/liqiuqiui/modheader2/issues";
+const HELP_URL = "https://github.com/liqiuqiui/modheader2#readme";
 
 const SortableProfileItem = memo(function SortableProfileItem({
   collapsed,
@@ -81,6 +84,16 @@ export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => 
   const setSearchQuery = useAppStore((state) => state.setSearchQuery);
   const showNotice = useAppStore((state) => state.showNotice);
 
+  // Expanding from the collapsed search icon should land in the search field
+  // instead of requiring a second click.
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [focusSearchOnExpand, setFocusSearchOnExpand] = useState(false);
+  useEffect(() => {
+    if (collapsed || !focusSearchOnExpand) return;
+    setFocusSearchOnExpand(false);
+    searchInputRef.current?.focus();
+  }, [collapsed, focusSearchOnExpand]);
+
   const handleDragEnd = (event: DragEndEvent) => {
     if (event.canceled || !isSortableOperation(event.operation)) return;
     const { source, target } = event.operation;
@@ -123,7 +136,7 @@ export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => 
           )}
         </button>
         {!collapsed && (
-          <span className="text-sm font-bold tracking-tight text-slate-800">ModHeader V2</span>
+          <span className="text-sm font-bold tracking-tight text-slate-800">{t("app.name")}</span>
         )}
       </div>
 
@@ -132,7 +145,10 @@ export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => 
           <button
             type="button"
             aria-label={t("nav.searchRules")}
-            onClick={() => setCollapsed(false)}
+            onClick={() => {
+              setCollapsed(false);
+              setFocusSearchOnExpand(true);
+            }}
             className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
           >
             <Search aria-hidden="true" className="h-4 w-4" />
@@ -141,6 +157,7 @@ export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => 
           <label className="flex h-8 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-2.5 focus-within:border-[var(--theme-color)] focus-within:ring-2 focus-within:ring-[var(--theme-color)]">
             <Search aria-hidden="true" className="h-4 w-4 text-slate-400" />
             <input
+              ref={searchInputRef}
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder={t("nav.searchRules")}
@@ -223,8 +240,10 @@ export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => 
       </div>
 
       <div className="space-y-1 border-t border-slate-100 p-2">
-        <button
-          type="button"
+        <a
+          href={FEEDBACK_URL}
+          target="_blank"
+          rel="noreferrer"
           title={t("nav.feedback")}
           className="flex w-full items-center gap-3 rounded-lg p-2 text-xs text-slate-500 transition hover:bg-slate-50"
         >
@@ -235,9 +254,11 @@ export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => 
               <MessageSquare aria-hidden="true" className="h-4 w-4" /> {t("nav.feedback")}
             </>
           )}
-        </button>
-        <button
-          type="button"
+        </a>
+        <a
+          href={HELP_URL}
+          target="_blank"
+          rel="noreferrer"
           title={t("nav.help")}
           className="flex w-full items-center gap-3 rounded-lg p-2 text-xs text-slate-500 transition hover:bg-slate-50"
         >
@@ -248,7 +269,7 @@ export function Sidebar({ mode, onImport }: { mode: EditorMode; onImport: () => 
               <CircleHelp aria-hidden="true" className="h-4 w-4" /> {t("nav.help")}
             </>
           )}
-        </button>
+        </a>
       </div>
     </aside>
   );
