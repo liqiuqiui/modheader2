@@ -4,7 +4,9 @@ pre-commit:
     lint:
       glob: "*.{js,jsx,ts,tsx}"
       run: pnpm exec oxlint {staged_files}
+    # oxfmt 不支持 yaml/html，把它们放进 glob 会让「只暂存 yml/lockfile」
+    # 的提交因无目标文件而报错。
     format:
-      glob: "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx,yaml,yml,html}"
+      glob: "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx}"
       run: pnpm exec oxfmt --write {staged_files}
       stage_fixed: true
