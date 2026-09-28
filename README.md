@@ -43,7 +43,7 @@
 
 ## 构建与安装
 
-需要 Node 22+ 与 pnpm。
+需要 Node 22+ 与 pnpm（版本由 `packageManager` 固定）。
 
 ```bash
 pnpm install
@@ -53,6 +53,8 @@ pnpm build  # 构建到 .output/chrome-mv3
 
 在 `chrome://extensions` 开启开发者模式，加载 `.output/chrome-mv3` 目录即可。
 
+目前只支持 Chromium 内核（Chrome / Edge / Opera）：规则通过 `declarativeNetRequest` 下发，这是 MV3 能力，Firefox 与 Safari 的 MV2 产物装上后无法工作。
+
 ## 开发
 
-基于 WXT + React 19 + TypeScript + Zustand，规则通过 `declarativeNetRequest` 下发；测试基线 26 个文件 / 159 个用例，CI 会执行 lint、格式检查、类型检查、测试与构建。
+基于 WXT + React 19 + TypeScript + Zustand；测试覆盖 24 个文件 / 198 个用例，CI 会执行 lint、格式检查、类型检查、测试与 Chromium 三端构建。

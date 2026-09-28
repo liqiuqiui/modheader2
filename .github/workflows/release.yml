@@ -42,6 +42,11 @@ jobs:
           else
             VERSION="${GITHUB_REF_NAME#v}"
           fi
+          # 非法 semver 会让后续 wxt zip 产出带坏版本号的 manifest，在这里就拦掉。
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Version '$VERSION' is not a valid semver (expected X.Y.Z)"
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -52,10 +57,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # wxt 支持的全部目标，产物目录为 <browser>-<manifestVersion>：
-        # chrome/edge/opera → mv3，firefox/safari → mv2。
-        # firefox 与 opera 会额外产出 *-sources.zip（AMO 提交审核需要）。
-        browser: [chrome, firefox, edge, opera, safari]
+        # 只发布 Chromium 目标：firefox/safari 是 MV2 产物，而规则下发依赖
+        # declarativeNetRequest（MV3），装上去会在运行时报错。
+        # opera 会额外产出 *-sources.zip（提交审核需要）。
+        browser: [chrome, edge, opera]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -118,6 +123,8 @@ jobs:
     name: GitHub Release
     needs: [version, package]
     runs-on: ubuntu-latest
+    # dry_run 只做凭据校验，不应真的建 Release 和 tag。
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run != true }}
     steps:
       - name: Download zips
         uses: actions/download-artifact@v8

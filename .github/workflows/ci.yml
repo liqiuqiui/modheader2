@@ -65,12 +65,11 @@ jobs:
       fail-fast: false
       matrix:
         # `-b` 传的是 wxt 的浏览器名，不是产物目录名：产物目录按
-        # <browser>-<manifestVersion> 命名（chrome/edge/opera → mv3，
-        # firefox/safari → mv2），传 chrome-mv3 会得到 chrome-mv3-mv3，
-        # 所以下面的断言与上传都用通配符。
-        # Firefox 若要提交 AMO，还需在 wxt.config.ts 配置
-        # browser_specific_settings.gecko.id（只打包不需要）。
-        browser: [chrome, firefox, edge, opera, safari]
+        # <browser>-<manifestVersion> 命名（chrome/edge/opera → mv3），
+        # 传 chrome-mv3 会得到 chrome-mv3-mv3，所以下面的断言与上传都用通配符。
+        # 只构建 Chromium 目标：规则下发使用 declarativeNetRequest，firefox 与
+        # safari 产物是 MV2，装上去会在运行时报错。等补齐 MV2 降级实现再放开。
+        browser: [chrome, edge, opera]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
