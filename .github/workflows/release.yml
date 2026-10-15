@@ -5,13 +5,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
+      # 手动触发只用于演练构建：产物打到 artifact 就结束，不建 Release、不上架。
       version:
-        description: "发布版本号，例如 1.2.0（不带 v 前缀）"
+        description: "构建演练用的版本号，例如 1.2.0（不带 v 前缀）"
         required: true
-      dry_run:
-        description: "仅校验商店凭据，不上传/不提交审核"
-        type: boolean
-        default: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -119,13 +116,19 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  github-release:
-    name: GitHub Release
+  draft-release:
+    name: Draft GitHub Release
     needs: [version, package]
     runs-on: ubuntu-latest
-    # dry_run 只做凭据校验，不应真的建 Release 和 tag。
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run != true }}
+    # 只在推 tag 时建 Release；workflow_dispatch 是纯构建演练，不发版。
+    # 建草稿而非正式 Release：发布说明需要人工在 GitHub 上定稿，
+    # Publish 之后才会触发 publish-store.yml 上架商店。
+    if: ${{ github.event_name == 'push' }}
     steps:
+      # body_path 要读仓库里的 .github/RELEASE_NOTES.md，所以必须先 checkout。
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Download zips
         uses: actions/download-artifact@v8
         with:
@@ -133,111 +136,15 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Create release
+      - name: Create draft release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.version.outputs.tag }}
           name: v${{ needs.version.outputs.version }}
           files: dist/*.zip
-          generate_release_notes: true
-          draft: false
+          # 发布说明由人写：取自 .github/RELEASE_NOTES.md，随代码一起 review。
+          # 不用 generate_release_notes——它按英文关键词分类，中文提交信息会
+          # 全部落进 Other Changes，且完全丢弃 commit 正文。
+          body_path: .github/RELEASE_NOTES.md
+          draft: true
           prerelease: ${{ contains(needs.version.outputs.version, '-') }}
-
-  submit:
-    name: Submit to stores
-    # Opera / Safari 只构建并附在 Release 上：publish-browser-extension
-    # 只支持 Chrome Web Store、AMO、Edge Addons 三家商店。
-    needs: [version, package]
-    runs-on: ubuntu-latest
-    # `secrets` 不能出现在 job 级 if（GitHub 不支持该上下文），
-    # 所以凭据先映射到 job 级 env，再由 step 级 if 决定是否真正提交。
-    env:
-      CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
-      # Chrome Web Store 目前只支持 v1.1 的 refresh token 方式：
-      # 本仓库使用的 publish-browser-extension 4.0.5 没有服务账号（API v2）实现，
-      # 不要传 CHROME_SERVICE_ACCOUNT_*，那会被静默忽略。
-      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
-      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
-      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
-      FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
-      FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
-      FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
-      EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
-      EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
-      EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
-      # tag 触发时 inputs 上下文为空，显式判断事件类型，不依赖空串比较的巧合
-      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Download zips
-        uses: actions/download-artifact@v8
-        with:
-          pattern: modheader-${{ needs.version.outputs.version }}-*
-          path: .output
-          merge-multiple: true
-
-      # 没配置任何商店凭据时跳过提交；dry_run 时仍会执行（带 --dry-run）
-      - name: Submit
-        if: env.CHROME_EXTENSION_ID != '' || env.FIREFOX_EXTENSION_ID != '' || env.EDGE_PRODUCT_ID != ''
-        run: |
-          set -euo pipefail
-
-          # 缺产物时给可读报错：ls 在 set -e + pipefail 下会直接中断整个步骤
-          find_zip() {
-            ls $1 2>/dev/null | head -1 || true
-          }
-
-          args=()
-          if [ -n "${CHROME_EXTENSION_ID:-}" ]; then
-            chrome_zip="$(find_zip '.output/*-chrome.zip')"
-            if [ -z "$chrome_zip" ]; then
-              echo "::error::找不到 Chrome 产物 zip（.output/*-chrome.zip）"
-              exit 1
-            fi
-            args+=(--chrome-zip "$chrome_zip")
-          fi
-          if [ -n "${FIREFOX_EXTENSION_ID:-}" ]; then
-            firefox_zip="$(find_zip '.output/*-firefox.zip')"
-            if [ -z "$firefox_zip" ]; then
-              echo "::error::找不到 Firefox 产物 zip（.output/*-firefox.zip）"
-              exit 1
-            fi
-            args+=(--firefox-zip "$firefox_zip")
-            # sources zip 缺失只警告，不能拼进参数（会被当成空路径）；
-            # 打包阶段已改名为 <browser>-sources.zip，避免与 opera 的同名文件冲突
-            firefox_sources_zip="$(find_zip '.output/*-firefox-sources.zip')"
-            if [ -n "$firefox_sources_zip" ]; then
-              args+=(--firefox-sources-zip "$firefox_sources_zip")
-            else
-              echo "::warning::没有找到 Firefox sources zip（.output/*-firefox-sources.zip），AMO 审核可能需要它"
-            fi
-          fi
-          if [ -n "${EDGE_PRODUCT_ID:-}" ]; then
-            # Edge 现在有独立构建，不再复用 Chrome 的 zip
-            edge_zip="$(find_zip '.output/*-edge.zip')"
-            if [ -z "$edge_zip" ]; then
-              echo "::error::找不到 Edge 产物 zip（.output/*-edge.zip）"
-              exit 1
-            fi
-            args+=(--edge-zip "$edge_zip")
-          fi
-          if [ "${DRY_RUN:-false}" = "true" ]; then
-            args+=(--dry-run)
-          fi
-          pnpm exec wxt submit "${args[@]}"

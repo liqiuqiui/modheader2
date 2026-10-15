@@ -1,0 +1,117 @@
+name: Publish to stores
+
+# 上架以「Release 被正式发布」为开关：
+# draft-release.yml 建的是草稿，人工在 GitHub 上定稿正文后点Publish，
+# 才会走到这里，避免 zip 还没传完就往商店推。
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "已发布的 tag，例如 v1.0.0"
+        required: true
+      dry_run:
+        description: "仅校验凭据与产物，不提交商店审核"
+        type: boolean
+        default: false
+
+concurrency:
+  group: store-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+# 只需下载 Release 附件，无需写仓库内容
+permissions:
+  contents: read
+
+env:
+  PNPM_VERSION: "10.33.4"
+  NODE_VERSION: "24"
+
+jobs:
+  submit:
+    name: Submit to stores
+    runs-on: ubuntu-latest
+    # `secrets` 不能出现在 job 级 if（GitHub 不支持该上下文），
+    # 所以凭据先映射到 job 级 env，再由 step 级 if 决定是否真正提交。
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      # release 事件没有 inputs 上下文，显式判断事件类型，不依赖空串比较的巧合
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+      CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+      # Chrome Web Store 目前只支持 v1.1 的 refresh token 方式：
+      # 本仓库使用的 publish-browser-extension 4.0.5 没有服务账号（API v2）实现，
+      # 不要传 CHROME_SERVICE_ACCOUNT_*，那会被静默忽略。
+      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+      EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+      EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 产物直接取 Release 附件，不再依赖 draft-release 那次运行的 artifact，
+      # 两者已经解除耦合：谁先Publish 不影响上架内容。
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p .output
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -D .output --clobber
+          ls -lh .output/
+
+      # 没配置任何商店凭据时跳过提交
+      - name: Submit
+        if: env.CHROME_EXTENSION_ID != '' || env.EDGE_PRODUCT_ID != ''
+        run: |
+          set -euo pipefail
+
+          # 缺产物时给可读报错：ls 在 set -e + pipefail 下会直接中断整个步骤
+          find_zip() {
+            ls $1 2>/dev/null | head -1 || true
+          }
+
+          args=()
+          if [ -n "${CHROME_EXTENSION_ID:-}" ]; then
+            chrome_zip="$(find_zip '.output/*-chrome.zip')"
+            if [ -z "$chrome_zip" ]; then
+              echo "::error::找不到 Chrome 产物 zip（.output/*-chrome.zip）"
+              exit 1
+            fi
+            args+=(--chrome-zip "$chrome_zip")
+          fi
+          if [ -n "${EDGE_PRODUCT_ID:-}" ]; then
+            # Edge 有独立构建，不复用 Chrome 的 zip
+            edge_zip="$(find_zip '.output/*-edge.zip')"
+            if [ -z "$edge_zip" ]; then
+              echo "::error::找不到 Edge 产物 zip（.output/*-edge.zip）"
+              exit 1
+            fi
+            args+=(--edge-zip "$edge_zip")
+          fi
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          pnpm exec wxt submit "${args[@]}"
+
+      - name: Skip notice
+        if: env.CHROME_EXTENSION_ID == '' && env.EDGE_PRODUCT_ID == ''
+        run: |
+          echo "::notice::未配置商店凭据，跳过上架。Chrome 需CHROME_EXTENSION_ID，Edge 需 EDGE_PRODUCT_ID。"

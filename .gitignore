@@ -39,6 +39,11 @@ temp/
 docs/research
 docs/plan
 
+# Agent 本地数据：会话记忆与设计过程稿，同docs/plan 一律不入库。
+# 注意 .codebuddy/skills/ 是有意跟踪的（工具说明书，换环境仍可用），不要一起忽略。
+.workbuddy/
+.creative-design/
+
 # Test and tool artifacts
 playwright-report/
 test-results/
