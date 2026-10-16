@@ -13,6 +13,10 @@ import {
   nextProfileTimeFilterExpiration,
 } from "../src/browser/profile/profile-dnr";
 import { profileActionBadgeController } from "../src/browser/profile/profile-action-badge";
+import {
+  resolveProfileSwitchTargetId,
+  PROFILE_SWITCH_COMMAND_PREFIX,
+} from "../src/browser/profile/profile-switch-command";
 import { createProfileSourceId } from "../src/browser/profile/profile-command-client";
 import {
   isProfileCommandMessage,
@@ -32,7 +36,9 @@ import {
 } from "../src/browser/profile/profile-background-queue";
 
 const CONTEXT_MENU_ID = "toggle_pause";
-const PROFILE_CONTEXT_MENU_ID_PREFIX = "switch_to_profile_";
+// Context-menu ids reuse the command prefix but carry a profile *id*, so they are
+// resolved by identity rather than by the 1-based position used for shortcuts.
+const PROFILE_CONTEXT_MENU_ID_PREFIX = PROFILE_SWITCH_COMMAND_PREFIX;
 const PROFILE_MENU_ROOT_ID = "switch_profile_root";
 const TIME_FILTER_ALARM = "checkTimeFilterAlarm";
 const BACKGROUND_SOURCE_ID = createProfileSourceId("background");
@@ -276,9 +282,9 @@ export default defineBackground(() => {
 
 /**
  * `toggle_pause` flips the global switch, and `switch_to_profile_N` selects the
- * Nth profile. Both mirror the legacy shortcut names so muscle memory carries
- * over, and both go through the command queue so they cannot interleave with a
- * window that is mid-write.
+ * Nth profile (1-based, so `_1` is the *first* profile). Both mirror the legacy
+ * shortcut names so muscle memory carries over, and both go through the command
+ * queue so they cannot interleave with a window that is mid-write.
  */
 async function handleBrowserCommand(command: string): Promise<void> {
   if (command === "toggle_pause") {
@@ -294,17 +300,13 @@ async function handleBrowserCommand(command: string): Promise<void> {
     return;
   }
 
-  if (!command.startsWith("switch_to_profile_")) return;
-  const index = Number.parseInt(command.slice("switch_to_profile_".length), 10);
-  if (!Number.isInteger(index) || index < 0) return;
-
   await enqueueDocumentTask(async () => {
     const current = await readStoredProfileDocument();
-    const profile = current.state.profiles[index];
-    if (!profile) return;
+    const profileId = resolveProfileSwitchTargetId(command, current.state.profiles);
+    if (!profileId) return;
     const result = reduceProfileCommand(
       current,
-      { type: "selectProfile", profileId: profile.id },
+      { type: "selectProfile", profileId },
       BACKGROUND_SOURCE_ID,
     );
     if (result.status === "applied") await writeStoredProfileDocument(result.document);
