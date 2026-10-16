@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Popover } from "radix-ui";
+import * as Popover from "radix-ui/popover";
 import { clsx } from "clsx";
 import { Check, ChevronDown, RefreshCw, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
