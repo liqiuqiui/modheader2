@@ -8,6 +8,10 @@ export default defineConfig({
   },
   modules: ["@wxt-dev/module-react"],
   dev: {
+    // Chrome 只接受最多 4 个带 suggested_key 的命令，manifest 里的快捷键已占满，
+    // 再让 WXT 注入 `wxt:reload-extension` 会触发清单加载失败。这里显式关掉。
+    // 自动重载不受影响：它走 Vite HMR WebSocket，不需要快捷键。
+    reloadCommand: false,
     server: {
       port: 3003,
       strictPort: true,
@@ -60,6 +64,11 @@ export default defineConfig({
     },
     // Shortcuts mirror the legacy ModHeader command names so an upgrade keeps
     // the same muscle memory. Chrome only accepts Ctrl/Alt/Command+Shift here.
+    //
+    // Chrome hard-caps `suggested_key` at 4 entries and *rejects the whole
+    // manifest* beyond that (not just a silent no-op), so the 5th command keeps
+    // its name and description but ships unbound. Users can still assign it in
+    // chrome://extensions/shortcuts, and the context menu covers the same action.
     commands: {
       toggle_pause: {
         suggested_key: { default: "Alt+Shift+P" },
@@ -78,7 +87,6 @@ export default defineConfig({
         description: "__MSG_commandSwitchProfile3__",
       },
       switch_to_profile_4: {
-        suggested_key: { default: "Alt+Shift+4" },
         description: "__MSG_commandSwitchProfile4__",
       },
     },
