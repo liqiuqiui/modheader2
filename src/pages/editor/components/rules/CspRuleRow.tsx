@@ -5,7 +5,7 @@ import { Copy, MessageSquarePlus, MessageSquareX, MoreHorizontal, Trash2 } from 
 import { useTranslation } from "react-i18next";
 import type { CspRule } from "../../../../types/profile/profile-model";
 import { Input } from "../../../../components/ui/input";
-import { Switch } from "../../../../components/ui/switch";
+import { Checkbox } from "../../../../components/ui/checkbox";
 
 function CspRuleRowComponent({
   rule,
@@ -63,7 +63,7 @@ function CspRuleRowComponent({
       )}
     >
       <div className="flex items-center gap-2">
-        <Switch
+        <Checkbox
           checked={rule.enabled}
           onCheckedChange={(enabled) => onChange(rule.id, { enabled })}
           aria-label={t(rule.enabled ? "csp.disableRule" : "csp.enableRule", {

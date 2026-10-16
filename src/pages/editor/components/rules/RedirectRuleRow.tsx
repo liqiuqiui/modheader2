@@ -4,7 +4,7 @@ import { MessageSquarePlus, MessageSquareX, MoreHorizontal, X } from "lucide-rea
 import { memo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "../../../../components/ui/input";
-import { Switch } from "../../../../components/ui/switch";
+import { Checkbox } from "../../../../components/ui/checkbox";
 import type { NameValueRule } from "../../../../types/profile/profile-model";
 import { menuItemClass } from "../shared/styles";
 
@@ -33,7 +33,7 @@ function RedirectRuleRowComponent({
       )}
     >
       <div className="flex items-center gap-2">
-        <Switch
+        <Checkbox
           checked={replacement.enabled}
           onCheckedChange={(enabled) => onChange(replacement.id, { enabled })}
           aria-label={t("redirect.enable")}

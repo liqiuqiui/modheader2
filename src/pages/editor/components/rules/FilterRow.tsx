@@ -5,7 +5,7 @@ import { GripVertical, MessageSquarePlus, MessageSquareX, MoreHorizontal, X } fr
 import { memo, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "../../../../components/ui/input";
-import { Switch } from "../../../../components/ui/switch";
+import { Checkbox } from "../../../../components/ui/checkbox";
 import {
   FILTER_KINDS,
   FILTER_MODES,
@@ -88,7 +88,7 @@ function FilterRowComponent({
         >
           <GripVertical aria-hidden="true" className="h-4 w-4" />
         </button>
-        <Switch
+        <Checkbox
           checked={filter.enabled}
           onCheckedChange={(enabled) => onPatch(filter.id, filter.kind, { enabled })}
           aria-label={t("filter.enable")}

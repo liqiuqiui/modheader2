@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../../../components/ui/select";
-import { Switch } from "../../../../components/ui/switch";
+import { Checkbox } from "../../../../components/ui/checkbox";
 import type { CookieRule, CookieWriteMode } from "../../../../types/profile/profile-model";
 import { menuItemClass } from "../shared/styles";
 import { useAutoFocusOnce } from "../shared/use-auto-focus-once";
@@ -56,7 +56,7 @@ function CookieRuleRowComponent({
       )}
     >
       <div className="flex items-center gap-2">
-        <Switch
+        <Checkbox
           checked={cookie.enabled}
           onCheckedChange={(enabled) => onChange(cookie.id, { enabled })}
           aria-label={t("cookie.enable")}

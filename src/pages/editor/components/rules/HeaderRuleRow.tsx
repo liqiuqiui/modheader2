@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../../../components/ui/select";
-import { Switch } from "../../../../components/ui/switch";
+import { Checkbox } from "../../../../components/ui/checkbox";
 import { useTranslation } from "react-i18next";
 import { useAutoFocusOnce } from "../shared/use-auto-focus-once";
 
@@ -104,7 +104,7 @@ function HeaderRuleRowComponent({
             className="hidden h-4 w-4 shrink-0 cursor-grab text-slate-300 sm:block"
           />
         )}
-        <Switch
+        <Checkbox
           checked={rule.enabled}
           onCheckedChange={(enabled) => onChange(rule.id, { enabled })}
           aria-label={`${rule.name || "Header"} ${rule.enabled ? t("common.enabled") : t("common.disabled")}`}

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Switch } from "../../../../components/ui/switch";
+import { Checkbox } from "../../../../components/ui/checkbox";
 import { useEditorController } from "../../editor-controller";
 
 export function ProfileStatusCard() {
@@ -9,7 +9,7 @@ export function ProfileStatusCard() {
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <Switch
+      <Checkbox
         checked={profile.enabled}
         onCheckedChange={(enabled) => void actions.patchProfile(profile.id, { enabled })}
         aria-label={profile.enabled ? t("common.enabled") : t("common.disabled")}
