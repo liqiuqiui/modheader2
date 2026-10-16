@@ -9,6 +9,7 @@ import {
   toPersistedState,
 } from "../../types/profile/profile-persistence";
 import { createProfileError } from "../../types/profile/profile-error";
+import { migrateProfileDocument } from "../../types/profile/profile-migration";
 import { isProfileDocument } from "../../types/profile/profile-validation";
 import type { PersistedProfileState } from "../../types/profile/profile-model";
 
@@ -48,21 +49,50 @@ function isPersistedProfileDocument(value: unknown): value is PersistedProfileDo
   );
 }
 
-export async function readStoredProfileDocument(): Promise<ProfileDocument> {
+/**
+ * A document written by an earlier version fails strict validation, so it is
+ * migrated on read rather than rejected. The migrated shape is written straight
+ * back so the upgrade only costs one extra write.
+ */
+async function readMigratedProfileDocument(): Promise<{
+  document: ProfileDocument;
+  migrated: boolean;
+}> {
   const persisted = await profileStateStorage.getValue();
-  if (!isPersistedProfileDocument(persisted)) {
+  if (isPersistedProfileDocument(persisted)) {
+    const state = fromPersistedState(persisted.state);
+    return {
+      document: {
+        schemaVersion: createEmptyProfileDocument().schemaVersion,
+        revision: persisted.revision,
+        sourceId: persisted.sourceId,
+        isPaused: state.isPaused,
+        state: { profiles: state.profiles, selectedProfileId: state.selectedProfileId },
+      },
+      migrated: false,
+    };
+  }
+
+  const migrated = migrateProfileDocument(persisted);
+  if (!migrated) {
     throw Object.assign(new Error("Invalid profile storage document"), {
       profileError: createProfileError("invalidStorageDocument"),
     });
   }
-  const state = fromPersistedState(persisted.state);
-  return {
-    schemaVersion: createEmptyProfileDocument().schemaVersion,
-    revision: persisted.revision,
-    sourceId: persisted.sourceId,
-    isPaused: state.isPaused,
-    state: { profiles: state.profiles, selectedProfileId: state.selectedProfileId },
-  };
+  await profileStateStorage.setValue({
+    state: toPersistedState(
+      migrated.state.profiles,
+      migrated.state.selectedProfileId,
+      migrated.isPaused,
+    ),
+    revision: migrated.revision,
+    sourceId: migrated.sourceId,
+  });
+  return { document: migrated, migrated: true };
+}
+
+export async function readStoredProfileDocument(): Promise<ProfileDocument> {
+  return (await readMigratedProfileDocument()).document;
 }
 
 export async function writeStoredProfileDocument(document: ProfileDocument): Promise<void> {
