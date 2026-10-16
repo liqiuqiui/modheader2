@@ -96,6 +96,21 @@ export function ProfileEditorApp({ mode = "options" }: { mode?: EditorMode } = {
       const profiles = parseImportedProfiles(JSON.parse(await file.text()));
       if (!profiles) throw new Error(t("import.invalid"));
       if (profiles.length === 0) throw new Error(t("import.empty"));
+
+      // Merging is the common case when a user exports one profile and tweaks
+      // it elsewhere: appending would silently create a near-duplicate.
+      const current = currentProfile();
+      const merge =
+        profiles.length === 1 &&
+        Boolean(current) &&
+        window.confirm(t("profile.mergeConfirm", { title: profiles[0].title }));
+
+      if (merge && current) {
+        const merged = await actions.mergeProfile(current.id, profiles[0]);
+        showNotice(merged ? t("profile.mergeImported") : t("profile.mergeNothing"));
+        return;
+      }
+
       const count = await actions.importProfiles(profiles);
       if (count === 0) {
         throw new Error(errorMessage || t("import.invalid"));

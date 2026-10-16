@@ -30,7 +30,7 @@ export function EditorSections({ mode }: { mode: EditorMode }) {
   }, [clearFocusRequest, focusRequest]);
 
   if (!profile) return null;
-  const { requestHeaders, responseHeaders, csp, cookies, redirects } = profile.rules;
+  const { requestHeaders, responseHeaders, csp, cookies, setCookies, redirects } = profile.rules;
 
   return (
     <div className={clsx(compact ? "space-y-2.5" : "space-y-4")}>
@@ -48,6 +48,17 @@ export function EditorSections({ mode }: { mode: EditorMode }) {
         <CookieSection
           profileId={profile.id}
           cookies={cookies}
+          searchQuery={searchQuery}
+          focusCookieId={focusRequest?.kind === "cookie" ? focusRequest.id : null}
+          compact={compact}
+        />
+      )}
+      {setCookies.length > 0 && (
+        <CookieSection
+          profileId={profile.id}
+          collection="setCookies"
+          title={t("section.setCookies")}
+          cookies={setCookies}
           searchQuery={searchQuery}
           focusCookieId={focusRequest?.kind === "cookie" ? focusRequest.id : null}
           compact={compact}

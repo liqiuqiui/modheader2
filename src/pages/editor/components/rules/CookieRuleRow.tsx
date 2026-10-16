@@ -4,8 +4,16 @@ import { Copy, MessageSquarePlus, MessageSquareX, MoreHorizontal, X } from "luci
 import { memo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "../../../../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../../components/ui/select";
 import { Switch } from "../../../../components/ui/switch";
-import type { NameValueRule } from "../../../../types/profile/profile-model";
+import type { CookieRule, CookieWriteMode } from "../../../../types/profile/profile-model";
 import { menuItemClass } from "../shared/styles";
 import { useAutoFocusOnce } from "../shared/use-auto-focus-once";
 
@@ -13,14 +21,17 @@ function CookieRuleRowComponent({
   cookie,
   compact,
   autoFocus,
+  showWriteMode = true,
   onChange,
   onDelete,
   onClone,
 }: {
-  cookie: NameValueRule;
+  cookie: CookieRule;
   compact: boolean;
   autoFocus: boolean;
-  onChange: (ruleId: string, patch: Partial<NameValueRule>) => void;
+  /** `Set-Cookie` rows are always written as-is, so they hide the control. */
+  showWriteMode?: boolean;
+  onChange: (ruleId: string, patch: Partial<CookieRule>) => void;
   onDelete: (ruleId: string) => void;
   onClone: (ruleId: string) => void;
 }) {
@@ -29,6 +40,12 @@ function CookieRuleRowComponent({
   const commentRef = useRef<HTMLInputElement>(null);
   const shouldAutoFocus = useAutoFocusOnce(autoFocus);
   const commentVisible = showComment || Boolean(cookie.comment);
+  const writeModes: { value: CookieWriteMode; label: string; hint: string }[] = [
+    { value: "set", label: t("cookie.writeSet"), hint: t("cookie.writeSetHint") },
+    { value: "append", label: t("cookie.writeAppend"), hint: t("cookie.writeAppendHint") },
+  ];
+  const activeWriteMode =
+    writeModes.find((mode) => mode.value === cookie.writeMode) ?? writeModes[0];
 
   return (
     <div
@@ -62,6 +79,31 @@ function CookieRuleRowComponent({
           onChange={(event) => onChange(cookie.id, { value: event.target.value })}
           spellCheck={false}
         />
+        {showWriteMode && !compact && (
+          <Select
+            value={cookie.writeMode}
+            onValueChange={(writeMode) =>
+              onChange(cookie.id, { writeMode: writeMode as CookieWriteMode })
+            }
+          >
+            <SelectTrigger
+              aria-label={t("cookie.writeMode")}
+              title={activeWriteMode.hint}
+              className="h-8 w-[9.5rem] shrink-0 border-slate-200 bg-slate-50 text-xs font-normal text-slate-600 shadow-none hover:bg-white"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {writeModes.map((mode) => (
+                  <SelectItem key={mode.value} value={mode.value}>
+                    {mode.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        )}
         <button
           type="button"
           aria-label={t("cookie.delete")}

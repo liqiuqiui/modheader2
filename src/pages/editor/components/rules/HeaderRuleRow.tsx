@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { AppendMode, HeaderRule } from "../../../../types/profile/profile-model";
+import { checkHeaderName } from "../../../../types/profile/profile-header-name";
 import {
   Combobox,
   ComboboxContent,
@@ -83,8 +84,10 @@ function HeaderRuleRowComponent({
   const appendModes: { value: AppendMode; label: string }[] = [
     { value: "override", label: t("header.override") },
     { value: "append", label: t("header.append") },
-    { value: "comma", label: t("header.comma") },
+    { value: "remove", label: t("header.remove") },
   ];
+  const nameCheck = useMemo(() => checkHeaderName(rule.name), [rule.name]);
+  const removing = rule.appendMode === "remove";
 
   return (
     <div
@@ -122,7 +125,8 @@ function HeaderRuleRowComponent({
         >
           <ComboboxInput
             aria-label={t("header.name")}
-            className="h-8 min-w-0 flex-[0.85] border-slate-200 bg-slate-50 shadow-none focus-within:bg-white [&_[data-slot=input-group-control]]:font-mono"
+            aria-invalid={nameCheck.problem === "syntax" || nameCheck.problem === "protected"}
+            className="h-8 min-w-0 flex-[0.85] border-slate-200 bg-slate-50 shadow-none focus-within:bg-white aria-[invalid=true]:border-rose-300 [&_[data-slot=input-group-control]]:font-mono"
             placeholder={t("header.namePlaceholder")}
             autoFocus={shouldAutoFocus && !rule.name}
             spellCheck={false}
@@ -147,13 +151,15 @@ function HeaderRuleRowComponent({
             aria-label={t("header.value")}
             type={sensitive && !revealed ? "password" : "text"}
             className="h-8 border-slate-200 bg-slate-50 pr-9 font-mono text-xs font-normal shadow-none focus-visible:bg-white"
-            placeholder={t("header.valuePlaceholder")}
+            placeholder={removing ? t("header.removeHint") : t("header.valuePlaceholder")}
             value={rule.value}
+            disabled={removing}
+            title={removing ? t("header.removeHint") : undefined}
             autoFocus={shouldAutoFocus && Boolean(rule.name)}
             onChange={(event) => onChange(rule.id, { value: event.target.value })}
             spellCheck={false}
           />
-          {sensitive && (
+          {sensitive && !removing && (
             <button
               type="button"
               aria-label={revealed ? t("header.hideValue") : t("header.showValue")}
@@ -256,6 +262,16 @@ function HeaderRuleRowComponent({
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       </div>
+      {nameCheck.problem === "syntax" && (
+        <p className="mt-1 pl-0 text-[11px] leading-4 text-rose-600 sm:pl-10">
+          {t("header.invalidName")}
+        </p>
+      )}
+      {nameCheck.problem === "protected" && (
+        <p className="mt-1 pl-0 text-[11px] leading-4 text-amber-600 sm:pl-10">
+          {t("header.protectedName")}
+        </p>
+      )}
       {showComment && (
         <div className="mt-2 pl-0 sm:pl-10">
           <Input

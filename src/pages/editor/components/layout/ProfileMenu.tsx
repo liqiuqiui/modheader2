@@ -1,10 +1,13 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { clsx } from "clsx";
-import { Copy, FileDown, MoreVertical, Palette, Pencil, Trash2 } from "lucide-react";
+import { Copy, FileDown, GitMerge, MoreVertical, Palette, Pencil, Pin, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconButtonClass, menuItemClass } from "../shared/styles";
 
 export function ProfileMenu({
+  alwaysOn,
+  onToggleAlwaysOn,
+  onSortByTitle,
   onRename,
   onClone,
   onPickColor,
@@ -13,6 +16,9 @@ export function ProfileMenu({
   onDelete,
   onCloseAutoFocus,
 }: {
+  alwaysOn: boolean;
+  onToggleAlwaysOn: () => void;
+  onSortByTitle: () => void;
   onRename: () => void;
   onClone: () => void;
   onPickColor: () => void;
@@ -50,7 +56,21 @@ export function ProfileMenu({
           <DropdownMenu.Item className={menuItemClass} onSelect={onPickColor}>
             <Palette aria-hidden="true" className="h-4 w-4" /> {t("profile.changeColor")}
           </DropdownMenu.Item>
+          <DropdownMenu.Item
+            className={menuItemClass}
+            onSelect={onToggleAlwaysOn}
+            title={t("profile.alwaysOnHint")}
+          >
+            <Pin aria-hidden="true" className="h-4 w-4" />
+            <span className="flex-1">{t("profile.alwaysOn")}</span>
+            <span aria-hidden="true" className="text-[10px] text-slate-400">
+              {alwaysOn ? "ON" : "OFF"}
+            </span>
+          </DropdownMenu.Item>
           <DropdownMenu.Separator className="my-1 h-px bg-slate-100" />
+          <DropdownMenu.Item className={menuItemClass} onSelect={onSortByTitle}>
+            <GitMerge aria-hidden="true" className="h-4 w-4" /> {t("profile.sortByTitle")}
+          </DropdownMenu.Item>
           <DropdownMenu.Item className={menuItemClass} onSelect={onExport}>
             <FileDown aria-hidden="true" className="h-4 w-4" /> {t("profile.exportFile")}
           </DropdownMenu.Item>

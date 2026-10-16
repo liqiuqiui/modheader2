@@ -36,7 +36,14 @@
     "disabled": "Current profile is disabled",
     "none": "No profile to edit",
     "defaultName": "Profile {{number}}",
-    "copyName": "Copy of {{title}}"
+    "copyName": "Copy of {{title}}",
+    "alwaysOn": "Always apply",
+    "alwaysOnHint": "Keep this profile's rules active even when another profile is selected.",
+    "sortByTitle": "Sort profiles by title",
+    "merge": "Merge into current profile",
+    "mergeImported": "Merged {{count}} rule(s) into the current profile",
+    "mergeNothing": "Nothing new to merge",
+    "mergeConfirm": "Merge \"{{title}}\" into the current profile instead of adding it as a new profile?"
   },
   "nav": {
     "searchRules": "Search rules",
@@ -55,7 +62,10 @@
     "profileMenu": "Profile menu",
     "newProfile": "New profile",
     "expand": "Open in a tab",
-    "pausedBadge": "PAUSED"
+    "pausedBadge": "PAUSED",
+    "globalPause": "Pause everything",
+    "globalResume": "Resume everything",
+    "globalPausedBadge": "ALL PAUSED"
   },
   "section": {
     "requestHeaders": "Request Headers",
@@ -70,7 +80,9 @@
     "more": "More {{title}} actions",
     "clear": "Clear this section",
     "noRules": "No {{title}} yet",
-    "noMatchedRules": "No rules match your search"
+    "noMatchedRules": "No rules match your search",
+    "setCookies": "Set-Cookie",
+    "globalPause": "Pause all profiles"
   },
   "header": {
     "name": "Header name",
@@ -92,7 +104,11 @@
     "convertToRequest": "Convert to request headers",
     "override": "Override",
     "append": "Append",
-    "comma": "Comma append"
+    "comma": "Comma append",
+    "remove": "Remove header",
+    "invalidName": "Not a valid header name",
+    "protectedName": "Managed by the browser — cannot be modified",
+    "removeHint": "This header will be deleted from matching requests."
   },
   "csp": {
     "directive": "CSP directive",
@@ -172,7 +188,12 @@
     "font": "Font",
     "media": "Media",
     "object": "Object",
-    "other": "Other"
+    "other": "Other",
+    "ping": "Ping / beacon",
+    "cspReport": "CSP report",
+    "websocket": "WebSocket",
+    "webtransport": "WebTransport",
+    "webbundle": "WebBundle"
   },
   "tab": {
     "select": "Select a browser tab",
@@ -207,7 +228,13 @@
     "valuePlaceholder": "Cookie value",
     "enable": "Enable cookie",
     "delete": "Delete cookie",
-    "clone": "Duplicate cookie"
+    "clone": "Duplicate cookie",
+    "writeMode": "Cookie write mode",
+    "writeSet": "Replace all cookies",
+    "writeAppend": "Append to existing cookies",
+    "writeSetHint": "Replaces the whole Cookie header. Existing site cookies are lost.",
+    "writeAppendHint": "Adds these cookies to the ones the site already sends.",
+    "setCookies": "Response cookies"
   },
   "status": {
     "autoSave": "Changes are saved automatically and synced to the browser network layer"
@@ -230,6 +257,9 @@
   },
   "context": {
     "pause": "Pause current profile",
-    "resume": "Resume current profile"
+    "resume": "Resume current profile",
+    "pauseAll": "Pause ModHeader",
+    "resumeAll": "Resume ModHeader",
+    "switchProfile": "Switch profile"
   }
 }

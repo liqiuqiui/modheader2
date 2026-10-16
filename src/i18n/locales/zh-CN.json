@@ -36,7 +36,14 @@
     "disabled": "当前配置已禁用",
     "none": "没有可编辑的配置",
     "defaultName": "配置 {{number}}",
-    "copyName": "{{title}} 的副本"
+    "copyName": "{{title}} 的副本",
+    "alwaysOn": "始终生效",
+    "alwaysOnHint": "即使切换到其他配置，该配置的规则仍然生效。",
+    "sortByTitle": "按标题排序配置",
+    "merge": "合并到当前配置",
+    "mergeImported": "已合并 {{count}} 条规则到当前配置",
+    "mergeNothing": "没有可合并的新内容",
+    "mergeConfirm": "将「{{title}}」合并到当前配置，而不是新建一个配置？"
   },
   "nav": {
     "searchRules": "搜索规则",
@@ -55,7 +62,10 @@
     "profileMenu": "配置菜单",
     "newProfile": "新增配置",
     "expand": "在新标签页打开",
-    "pausedBadge": "暂停中"
+    "pausedBadge": "暂停中",
+    "globalPause": "全部暂停",
+    "globalResume": "全部恢复",
+    "globalPausedBadge": "全部暂停"
   },
   "section": {
     "requestHeaders": "请求头",
@@ -70,7 +80,9 @@
     "more": "{{title}} 更多操作",
     "clear": "清空该分组",
     "noRules": "还没有 {{title}}",
-    "noMatchedRules": "没有匹配搜索条件的规则"
+    "noMatchedRules": "没有匹配搜索条件的规则",
+    "setCookies": "Set-Cookie",
+    "globalPause": "暂停全部配置"
   },
   "header": {
     "name": "Header 名称",
@@ -92,7 +104,11 @@
     "convertToRequest": "转换为请求头",
     "override": "覆盖",
     "append": "追加",
-    "comma": "逗号追加"
+    "comma": "逗号追加",
+    "remove": "删除该头",
+    "invalidName": "不是合法的 Header 名称",
+    "protectedName": "由浏览器管理，无法修改",
+    "removeHint": "匹配的请求中该Header 会被删除。"
   },
   "csp": {
     "directive": "CSP 指令",
@@ -170,7 +186,12 @@
     "font": "字体",
     "media": "媒体",
     "object": "对象",
-    "other": "其他"
+    "other": "其他",
+    "ping": "Ping / Beacon",
+    "cspReport": "CSP 上报",
+    "websocket": "WebSocket",
+    "webtransport": "WebTransport",
+    "webbundle": "WebBundle"
   },
   "tab": {
     "select": "选择浏览器 Tab",
@@ -205,7 +226,13 @@
     "valuePlaceholder": "Cookie 值",
     "enable": "启用 Cookie",
     "delete": "删除 Cookie",
-    "clone": "复制 Cookie"
+    "clone": "复制 Cookie",
+    "writeMode": "Cookie 写入方式",
+    "writeSet": "替换全部 Cookie",
+    "writeAppend": "追加到已有 Cookie",
+    "writeSetHint": "会覆盖整个 Cookie 头，站点原有 Cookie 将丢失。",
+    "writeAppendHint": "在站点已有的 Cookie 基础上追加这些值。",
+    "setCookies": "响应 Cookie"
   },
   "status": {
     "autoSave": "规则变化会自动保存并同步到浏览器网络层"
@@ -228,6 +255,9 @@
   },
   "context": {
     "pause": "暂停当前配置",
-    "resume": "恢复当前配置"
+    "resume": "恢复当前配置",
+    "pauseAll": "暂停 ModHeader",
+    "resumeAll": "恢复 ModHeader",
+    "switchProfile": "切换配置"
   }
 }

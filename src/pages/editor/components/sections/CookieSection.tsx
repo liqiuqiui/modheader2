@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
-import type { NameValueRule } from "../../../../types/profile/profile-model";
+import type { CookieRule, ProfileRuleCollection } from "../../../../types/profile/profile-model";
 import { createCookieRule } from "../../../../types/profile/profile-factory";
 import { useEditorController } from "../../editor-controller";
 import { CookieRuleRow } from "../rules/CookieRuleRow";
@@ -11,13 +11,17 @@ import { SectionHeader } from "./SectionHeader";
 
 export function CookieSection({
   profileId,
+  collection = "cookies",
+  title,
   cookies,
   searchQuery,
   focusCookieId,
   compact = false,
 }: {
   profileId: string;
-  cookies: NameValueRule[];
+  collection?: Extract<ProfileRuleCollection, "cookies" | "setCookies">;
+  title?: string;
+  cookies: CookieRule[];
   searchQuery: string;
   focusCookieId?: string | null;
   compact?: boolean;
@@ -27,6 +31,8 @@ export function CookieSection({
   const { addRule, patchRule, deleteRule, cloneRule, setRulesEnabled, clearRules } = actions;
   const [open, setOpen] = useState(true);
   const [localFocusCookieId, setLocalFocusCookieId] = useState<string | null>(null);
+  const sectionTitle = title ?? t("section.cookies");
+  const isSetCookie = collection === "setCookies";
   const query = searchQuery.trim().toLowerCase();
   const visibleCookies = cookies.filter(
     (cookie) =>
@@ -34,39 +40,39 @@ export function CookieSection({
   );
   const enabled = cookies.some((cookie) => cookie.enabled);
   const handleChange = useCallback(
-    (ruleId: string, patch: Partial<NameValueRule>) =>
-      void patchRule(profileId, "cookies", ruleId, patch),
-    [patchRule, profileId],
+    (ruleId: string, patch: Partial<CookieRule>) =>
+      void patchRule(profileId, collection, ruleId, patch),
+    [collection, patchRule, profileId],
   );
   const handleDelete = useCallback(
-    (ruleId: string) => void deleteRule(profileId, "cookies", ruleId),
-    [deleteRule, profileId],
+    (ruleId: string) => void deleteRule(profileId, collection, ruleId),
+    [collection, deleteRule, profileId],
   );
   const handleClone = useCallback(
     (ruleId: string) => {
       const cloneId = createCookieRule().id;
       setLocalFocusCookieId(cloneId);
-      void cloneRule(profileId, "cookies", ruleId, cloneId);
+      void cloneRule(profileId, collection, ruleId, cloneId);
     },
-    [cloneRule, profileId],
+    [cloneRule, collection, profileId],
   );
 
   return (
     <section>
       <SectionHeader
-        title={t("section.cookies")}
+        title={sectionTitle}
         count={cookies.length}
         open={open}
         enabled={enabled}
         onToggle={() => setOpen((current) => !current)}
-        onToggleEnabled={() => void setRulesEnabled(profileId, "cookies", !enabled)}
+        onToggleEnabled={() => void setRulesEnabled(profileId, collection, !enabled)}
         onAdd={() => {
           const cookie = createCookieRule();
           setLocalFocusCookieId(cookie.id);
-          void addRule(profileId, "cookies", cookie);
+          void addRule(profileId, collection, cookie);
           setOpen(true);
         }}
-        onClear={() => void clearRules(profileId, "cookies")}
+        onClear={() => void clearRules(profileId, collection)}
       />
       <SectionContent open={open} className={clsx(compact ? "space-y-1.5" : "space-y-2")}>
         {visibleCookies.map((cookie) => (
@@ -74,6 +80,7 @@ export function CookieSection({
             key={cookie.id}
             cookie={cookie}
             compact={compact}
+            showWriteMode={!isSetCookie}
             autoFocus={cookie.id === focusCookieId || cookie.id === localFocusCookieId}
             onChange={handleChange}
             onDelete={handleDelete}
@@ -81,7 +88,7 @@ export function CookieSection({
           />
         ))}
         {!compact && cookies.length === 0 && (
-          <EmptyState label={t("section.noRules", { title: t("section.cookies") })} />
+          <EmptyState label={t("section.noRules", { title: sectionTitle })} />
         )}
         {cookies.length > 0 && visibleCookies.length === 0 && (
           <EmptyState label={t("section.noMatchedRules")} />

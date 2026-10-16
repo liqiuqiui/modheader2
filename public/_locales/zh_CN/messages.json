@@ -4,5 +4,20 @@
   },
   "extensionDescription": {
     "message": "修改 HTTP 请求头、响应头和 URL 重定向"
+  },
+  "commandTogglePause": {
+    "message": "暂停或恢复全部请求头修改"
+  },
+  "commandSwitchProfile1": {
+    "message": "切换到配置 1"
+  },
+  "commandSwitchProfile2": {
+    "message": "切换到配置 2"
+  },
+  "commandSwitchProfile3": {
+    "message": "切换到配置 3"
+  },
+  "commandSwitchProfile4": {
+    "message": "切换到配置 4"
   }
 }

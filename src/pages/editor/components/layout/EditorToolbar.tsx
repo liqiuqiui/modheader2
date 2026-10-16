@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
-import { FileUp, Maximize2, Pause, Play, Plus, Redo2, Undo2 } from "lucide-react";
+import { FileUp, Maximize2, Pause, Play, Plus, Power, Redo2, Undo2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getProfileTextColor } from "../../../../types/profile/profile-appearance";
 import { useAppStore } from "../../../../store/app-store";
@@ -33,7 +33,14 @@ export function EditorToolbar({
   onProfileMenuCloseAutoFocus: (event: Event) => void;
 }) {
   const { t } = useTranslation();
-  const { profile: selectedProfile, profiles, canUndo, canRedo, actions } = useEditorController();
+  const {
+    profile: selectedProfile,
+    profiles,
+    canUndo,
+    canRedo,
+    isPaused,
+    actions,
+  } = useEditorController();
   const profile = selectedProfile
     ? {
         id: selectedProfile.id,
@@ -41,10 +48,19 @@ export function EditorToolbar({
         backgroundColor: selectedProfile.backgroundColor,
         foregroundColor: getProfileTextColor(selectedProfile.backgroundColor),
         paused: selectedProfile.paused,
+        alwaysOn: selectedProfile.alwaysOn,
         number: profiles.findIndex((item) => item.id === selectedProfile.id) + 1,
       }
     : null;
-  const { patchProfile, undo, redo, addProfile, cloneProfile } = actions;
+  const {
+    patchProfile,
+    undo,
+    redo,
+    addProfile,
+    cloneProfile,
+    setGlobalPaused,
+    sortProfilesByTitle,
+  } = actions;
   const showNotice = useAppStore((state) => state.showNotice);
   const [titleDraft, setTitleDraft] = useState(profile?.title ?? "");
 
@@ -76,7 +92,12 @@ export function EditorToolbar({
         aria-label={t("profile.name")}
         className="h-8 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-3 text-sm font-bold outline-none transition-[background-color,border-color,box-shadow] duration-200 ease-out placeholder:text-current/60 hover:border-white/10 hover:bg-white/15 focus:border-white/30 focus:bg-white/20 focus:ring-2 focus:ring-white/20"
       />
-      {profile.paused && (
+      {isPaused && (
+        <span className="rounded-md border border-white/25 bg-white/15 px-2 py-1 text-[10px] font-bold tracking-[0.08em]">
+          {t("toolbar.globalPausedBadge")}
+        </span>
+      )}
+      {profile.paused && !isPaused && (
         <span className="rounded-md border border-white/25 bg-white/15 px-2 py-1 text-[10px] font-bold tracking-[0.08em]">
           {t("toolbar.pausedBadge")}
         </span>
@@ -113,8 +134,19 @@ export function EditorToolbar({
         </button>
         <button
           type="button"
+          title={isPaused ? t("toolbar.globalResume") : t("toolbar.globalPause")}
+          aria-label={isPaused ? t("toolbar.globalResume") : t("toolbar.globalPause")}
+          aria-pressed={isPaused}
+          onClick={() => void setGlobalPaused(!isPaused)}
+          className={iconButtonClass(false, isPaused)}
+        >
+          <Power aria-hidden="true" className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
           title={profile.paused ? t("toolbar.resume") : t("toolbar.pause")}
           aria-label={profile.paused ? t("toolbar.resume") : t("toolbar.pause")}
+          aria-pressed={profile.paused}
           onClick={() => void patchProfile(profile.id, { paused: !profile.paused })}
           className={iconButtonClass()}
         >
@@ -144,6 +176,9 @@ export function EditorToolbar({
         </button>
         <LanguageMenu locale={locale} onLanguageChange={onLanguageChange} />
         <ProfileMenu
+          alwaysOn={profile.alwaysOn}
+          onToggleAlwaysOn={() => void patchProfile(profile.id, { alwaysOn: !profile.alwaysOn })}
+          onSortByTitle={() => void sortProfilesByTitle()}
           onRename={onRequestRename}
           onClone={() => {
             void cloneProfile(profile.id, locale).then((saved) => {

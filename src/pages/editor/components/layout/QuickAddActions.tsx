@@ -74,6 +74,16 @@ export function QuickAddActions() {
             </DropdownMenu.Item>
             <DropdownMenu.Item
               className={menuItemClass}
+              onSelect={() => {
+                const cookie = createCookieRule();
+                requestFocus("cookie", cookie.id);
+                void addRule(profileId, "setCookies", cookie);
+              }}
+            >
+              {t("section.setCookies")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              className={menuItemClass}
               onSelect={() => void addRule(profileId, "redirects", createRedirectRule())}
             >
               {t("section.urlRedirects")}

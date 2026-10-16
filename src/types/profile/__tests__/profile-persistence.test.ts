@@ -45,7 +45,7 @@ describe("profile persistence identity", () => {
     expect(restored).toMatchObject({ enabled: false, paused: true });
   });
 
-  it("restores cookies as NameValueRule objects without header-only fields", () => {
+  it("restores cookies as CookieRule objects without header-only fields", () => {
     const profile = createProfile({ title: "Cookies" });
     profile.rules.cookies.push(createCookieRule({ name: "session", value: "abc" }));
 
@@ -63,6 +63,7 @@ describe("profile persistence identity", () => {
       name: "session",
       value: "abc",
       comment: "",
+      writeMode: "set",
     });
     expect(isProfileDocument(document)).toBe(true);
   });

@@ -4,5 +4,20 @@
   },
   "extensionDescription": {
     "message": "Modify HTTP request headers, response headers, and URL redirects"
+  },
+  "commandTogglePause": {
+    "message": "Pause or resume all header modifications"
+  },
+  "commandSwitchProfile1": {
+    "message": "Switch to profile 1"
+  },
+  "commandSwitchProfile2": {
+    "message": "Switch to profile 2"
+  },
+  "commandSwitchProfile3": {
+    "message": "Switch to profile 3"
+  },
+  "commandSwitchProfile4": {
+    "message": "Switch to profile 4"
   }
 }

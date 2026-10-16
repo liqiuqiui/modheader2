@@ -3,8 +3,8 @@ export const menuItemClass =
 
 export const filterSelectTextClass = "text-xs font-normal text-slate-600";
 
-export function iconButtonClass(disabled = false) {
+export function iconButtonClass(disabled = false, active = false) {
   return `rounded-lg p-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
     disabled ? "cursor-not-allowed opacity-35" : "hover:bg-white/15"
-  }`;
+  }${active ? " bg-white/25" : ""}`;
 }

@@ -30,6 +30,11 @@ const RESOURCE_LABEL_KEYS: Record<ResourceType, ParseKeys> = {
   font: "resource.font",
   media: "resource.media",
   object: "resource.object",
+  ping: "resource.ping",
+  csp_report: "resource.cspReport",
+  websocket: "resource.websocket",
+  webtransport: "resource.webtransport",
+  webbundle: "resource.webbundle",
   other: "resource.other",
 };
 
