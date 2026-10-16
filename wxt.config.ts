@@ -58,5 +58,29 @@ export default defineConfig({
       page: "options.html",
       open_in_tab: true,
     },
+    // Shortcuts mirror the legacy ModHeader command names so an upgrade keeps
+    // the same muscle memory. Chrome only accepts Ctrl/Alt/Command+Shift here.
+    commands: {
+      toggle_pause: {
+        suggested_key: { default: "Alt+Shift+P" },
+        description: "__MSG_commandTogglePause__",
+      },
+      switch_to_profile_1: {
+        suggested_key: { default: "Alt+Shift+1" },
+        description: "__MSG_commandSwitchProfile1__",
+      },
+      switch_to_profile_2: {
+        suggested_key: { default: "Alt+Shift+2" },
+        description: "__MSG_commandSwitchProfile2__",
+      },
+      switch_to_profile_3: {
+        suggested_key: { default: "Alt+Shift+3" },
+        description: "__MSG_commandSwitchProfile3__",
+      },
+      switch_to_profile_4: {
+        suggested_key: { default: "Alt+Shift+4" },
+        description: "__MSG_commandSwitchProfile4__",
+      },
+    },
   },
 });

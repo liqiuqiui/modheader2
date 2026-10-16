@@ -1,5 +1,5 @@
 import { isPlainObject } from "lodash-es";
-import type { AppendMode, ProfileRuleCollection } from "./profile-model";
+import type { AppendMode, CookieWriteMode, ProfileRuleCollection } from "./profile-model";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return isPlainObject(value);
@@ -21,7 +21,11 @@ export function isNonNegativeInteger(value: unknown): value is number {
 }
 
 export function isAppendMode(value: unknown): value is AppendMode {
-  return value === "override" || value === "append" || value === "comma";
+  return value === "override" || value === "append" || value === "comma" || value === "remove";
+}
+
+export function isCookieWriteMode(value: unknown): value is CookieWriteMode {
+  return value === "set" || value === "append";
 }
 
 export function isProfileRuleCollection(value: unknown): value is ProfileRuleCollection {
@@ -30,6 +34,7 @@ export function isProfileRuleCollection(value: unknown): value is ProfileRuleCol
     value === "responseHeaders" ||
     value === "csp" ||
     value === "cookies" ||
+    value === "setCookies" ||
     value === "redirects"
   );
 }

@@ -9,7 +9,7 @@ import {
 } from "../src/services/profile/reduce-profile-command";
 import {
   applyDnrRules,
-  compileProfileDnrRules,
+  compileActiveProfilesDnrRules,
   nextProfileTimeFilterExpiration,
 } from "../src/browser/profile/profile-dnr";
 import { profileActionBadgeController } from "../src/browser/profile/profile-action-badge";
@@ -32,6 +32,8 @@ import {
 } from "../src/browser/profile/profile-background-queue";
 
 const CONTEXT_MENU_ID = "toggle_pause";
+const PROFILE_CONTEXT_MENU_ID_PREFIX = "switch_to_profile_";
+const PROFILE_MENU_ROOT_ID = "switch_profile_root";
 const TIME_FILTER_ALARM = "checkTimeFilterAlarm";
 const BACKGROUND_SOURCE_ID = createProfileSourceId("background");
 
@@ -57,9 +59,10 @@ async function scheduleTimeFilterAlarm(profile: Profile | undefined): Promise<vo
 }
 
 async function syncRules() {
-  const profile = selectedProfile(await readStoredProfileDocument());
+  const document = await readStoredProfileDocument();
+  const profile = selectedProfile(document);
   const tabs = await browser.tabs.query({});
-  const compilation = compileProfileDnrRules(profile, { tabs });
+  const compilation = compileActiveProfilesDnrRules(document, { tabs });
   if (compilation.diagnostics.length > 0) {
     console.warn(
       `Profile DNR compilation failed for ${profile?.id ?? "no selected profile"}: ${compilation.diagnostics.join("; ")}`,
@@ -72,6 +75,8 @@ async function syncRules() {
     await scheduleTimeFilterAlarm(profile);
     throw error;
   }
+  // Badge counts follow the selected profile only: a global `alwaysOn` profile
+  // must not inflate the number shown for the profile the user picked.
   await profileActionBadgeController.sync(profile, compilation.rules);
   await scheduleTimeFilterAlarm(profile);
 }
@@ -83,11 +88,40 @@ async function syncContextMenu() {
     localeStorage.getValue(),
     readStoredProfileDocument(),
   ]);
-  const profile = selectedProfile(document);
   const t = i18n.getFixedT(locale);
-  await browser.contextMenus.update(CONTEXT_MENU_ID, {
-    title: t(profile?.paused ? "context.resume" : "context.pause"),
+  await rebuildContextMenus(document, t);
+}
+
+type Translate = (key: string) => string;
+
+/** Rebuilds the whole menu tree. `contextMenus.update` cannot change a menu's
+ * parent, and profile entries appear and disappear as profiles are managed, so
+ * recreating the tree is simpler and less error-prone than patching it. */
+async function rebuildContextMenus(document: ProfileDocument, t: Translate): Promise<void> {
+  await browser.contextMenus.removeAll().catch(() => undefined);
+
+  await browser.contextMenus.create({
+    id: CONTEXT_MENU_ID,
+    title: t(document.isPaused ? "context.resumeAll" : "context.pauseAll"),
+    contexts: ["action"],
   });
+
+  const profiles = document.state.profiles;
+  if (profiles.length < 2) return;
+
+  await browser.contextMenus.create({
+    id: PROFILE_MENU_ROOT_ID,
+    title: t("context.switchProfile"),
+    contexts: ["action"],
+  });
+  for (const profile of profiles) {
+    await browser.contextMenus.create({
+      id: `${PROFILE_CONTEXT_MENU_ID_PREFIX}${profile.id}`,
+      parentId: PROFILE_MENU_ROOT_ID,
+      title: profile.title || t("profile.none"),
+      contexts: ["action"],
+    });
+  }
 }
 
 const scheduleRulesSync = createLatestTask(syncRules);
@@ -138,19 +172,10 @@ async function handleProfileCommand(
 
 async function createContextMenu() {
   await initializeI18n();
-  try {
-    await browser.contextMenus.remove(CONTEXT_MENU_ID);
-  } catch {
-    // The menu does not exist on the first run.
-  }
   const locale = await localeStorage.getValue();
-  const profile = selectedProfile(await readStoredProfileDocument());
+  const document = await readStoredProfileDocument();
   const t = i18n.getFixedT(locale);
-  await browser.contextMenus.create({
-    id: CONTEXT_MENU_ID,
-    title: t(profile?.paused ? "context.resume" : "context.pause"),
-    contexts: ["action"],
-  });
+  await rebuildContextMenus(document, t);
 }
 
 export default defineBackground(() => {
@@ -209,23 +234,79 @@ export default defineBackground(() => {
   });
 
   browser.contextMenus.onClicked.addListener((info) => {
-    if (info.menuItemId !== CONTEXT_MENU_ID) return;
-    void enqueueDocumentTask(async () => {
-      const current = await readStoredProfileDocument();
-      const profileId = current.state.selectedProfileId;
-      if (!profileId) return;
-      const profile = current.state.profiles.find((candidate) => candidate.id === profileId);
-      if (!profile) return;
-      const result = reduceProfileCommand(
-        current,
-        { type: "patchProfile", profileId, patch: { paused: !profile.paused } },
-        BACKGROUND_SOURCE_ID,
-      );
-      if (result.status === "applied") await writeStoredProfileDocument(result.document);
-    }).catch(console.error);
+    if (info.menuItemId === CONTEXT_MENU_ID) {
+      void enqueueDocumentTask(async () => {
+        const current = await readStoredProfileDocument();
+        const result = reduceProfileCommand(
+          current,
+          { type: "setGlobalPaused", paused: !current.isPaused },
+          BACKGROUND_SOURCE_ID,
+        );
+        if (result.status === "applied") await writeStoredProfileDocument(result.document);
+      }).catch(console.error);
+      return;
+    }
+
+    const menuItemId = String(info.menuItemId);
+    if (menuItemId.startsWith(PROFILE_CONTEXT_MENU_ID_PREFIX)) {
+      const profileId = menuItemId.slice(PROFILE_CONTEXT_MENU_ID_PREFIX.length);
+      void enqueueDocumentTask(async () => {
+        const current = await readStoredProfileDocument();
+        if (!current.state.profiles.some((profile) => profile.id === profileId)) return;
+        const result = reduceProfileCommand(
+          current,
+          { type: "selectProfile", profileId },
+          BACKGROUND_SOURCE_ID,
+        );
+        if (result.status === "applied") await writeStoredProfileDocument(result.document);
+      }).catch(console.error);
+    }
   });
 
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === TIME_FILTER_ALARM) scheduleRulesSync();
   });
+
+  if (browser.commands?.onCommand) {
+    browser.commands.onCommand.addListener((command) => {
+      void handleBrowserCommand(command).catch(console.error);
+    });
+  }
 });
+
+/**
+ * `toggle_pause` flips the global switch, and `switch_to_profile_N` selects the
+ * Nth profile. Both mirror the legacy shortcut names so muscle memory carries
+ * over, and both go through the command queue so they cannot interleave with a
+ * window that is mid-write.
+ */
+async function handleBrowserCommand(command: string): Promise<void> {
+  if (command === "toggle_pause") {
+    await enqueueDocumentTask(async () => {
+      const current = await readStoredProfileDocument();
+      const result = reduceProfileCommand(
+        current,
+        { type: "setGlobalPaused", paused: !current.isPaused },
+        BACKGROUND_SOURCE_ID,
+      );
+      if (result.status === "applied") await writeStoredProfileDocument(result.document);
+    });
+    return;
+  }
+
+  if (!command.startsWith("switch_to_profile_")) return;
+  const index = Number.parseInt(command.slice("switch_to_profile_".length), 10);
+  if (!Number.isInteger(index) || index < 0) return;
+
+  await enqueueDocumentTask(async () => {
+    const current = await readStoredProfileDocument();
+    const profile = current.state.profiles[index];
+    if (!profile) return;
+    const result = reduceProfileCommand(
+      current,
+      { type: "selectProfile", profileId: profile.id },
+      BACKGROUND_SOURCE_ID,
+    );
+    if (result.status === "applied") await writeStoredProfileDocument(result.document);
+  });
+}

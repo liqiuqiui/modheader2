@@ -95,6 +95,10 @@ export interface AppStoreState extends ProfileDataState, ProfileHistoryState, Pr
   deleteProfile: (profileId: string, locale: Locale) => Promise<boolean>;
   importProfiles: (profiles: Profile[]) => Promise<number>;
   sortProfileRules: (profileId: string) => Promise<boolean>;
+  /** Global kill switch: clears every compiled rule regardless of profile. */
+  setGlobalPaused: (paused: boolean) => Promise<boolean>;
+  sortProfilesByTitle: () => Promise<boolean>;
+  mergeProfile: (targetProfileId: string, source: Profile) => Promise<boolean>;
   undo: () => Promise<boolean>;
   redo: () => Promise<boolean>;
 }

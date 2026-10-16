@@ -18,6 +18,7 @@ import {
   type ProfileState,
 } from "../../types/profile/profile-document";
 import type { Profile } from "../../types/profile/profile-model";
+import { mergeProfileInto } from "../../types/profile/profile-merge";
 import { applyProfileMetadataPatch } from "../../types/profile/profile-operations";
 import {
   addProfileRule,
@@ -52,8 +53,9 @@ function nextDocument(
   current: ProfileDocument,
   state: ProfileState,
   sourceId: string,
+  isPaused = current.isPaused,
 ): ProfileDocument {
-  return createProfileDocument(state, sourceId, current.revision + 1, current.isPaused);
+  return createProfileDocument(state, sourceId, current.revision + 1, isPaused);
 }
 
 function replaceProfile(
@@ -106,6 +108,23 @@ function reduceProfileCommandDocument(
   if (command.type === "patchProfile") {
     return replaceProfile(current, command.profileId, sourceId, (profile) =>
       applyProfileMetadataPatch(profile, command.patch),
+    );
+  }
+
+  if (command.type === "setGlobalPaused") {
+    if (typeof command.paused !== "boolean" || command.paused === current.isPaused) return current;
+    return nextDocument(current, state, sourceId, command.paused);
+  }
+
+  if (command.type === "sortProfilesByTitle") {
+    const sorted = [...state.profiles].sort((left, right) => left.title.localeCompare(right.title));
+    if (sorted.every((profile, index) => profile.id === state.profiles[index].id)) return current;
+    return nextDocument(current, { ...state, profiles: sorted }, sourceId);
+  }
+
+  if (command.type === "mergeProfile") {
+    return replaceProfile(current, command.targetProfileId, sourceId, (profile) =>
+      mergeProfileInto(profile, command.source),
     );
   }
 

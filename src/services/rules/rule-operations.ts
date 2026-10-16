@@ -12,6 +12,7 @@ import {
   isRecord,
 } from "../../types/profile/profile-guards";
 import type {
+  CookieRule,
   CspRule,
   HeaderRule,
   NameValueRule,
@@ -20,13 +21,19 @@ import type {
   ProfileRuleCollection,
 } from "../../types/profile/profile-model";
 import { profileHasEntityId } from "../../types/profile/profile-operations";
-import { isCspRule, isHeaderRule, isNameValueRule } from "../../types/profile/profile-validation";
+import {
+  isCookieRule,
+  isCspRule,
+  isHeaderRule,
+  isNameValueRule,
+} from "../../types/profile/profile-validation";
 
 function ruleCollection(profile: Profile, collection: ProfileRuleCollection): ProfileRule[] {
   if (collection === "requestHeaders") return profile.rules.requestHeaders;
   if (collection === "responseHeaders") return profile.rules.responseHeaders;
   if (collection === "csp") return profile.rules.csp;
   if (collection === "cookies") return profile.rules.cookies;
+  if (collection === "setCookies") return profile.rules.setCookies;
   return profile.rules.redirects;
 }
 
@@ -45,7 +52,10 @@ function replaceRuleCollection(
     return { ...profile, rules: { ...profile.rules, csp: rules as CspRule[] } };
   }
   if (collection === "cookies") {
-    return { ...profile, rules: { ...profile.rules, cookies: rules as NameValueRule[] } };
+    return { ...profile, rules: { ...profile.rules, cookies: rules as CookieRule[] } };
+  }
+  if (collection === "setCookies") {
+    return { ...profile, rules: { ...profile.rules, setCookies: rules as CookieRule[] } };
   }
   return { ...profile, rules: { ...profile.rules, redirects: rules as NameValueRule[] } };
 }
@@ -58,6 +68,7 @@ function isRuleForCollection(
     return isHeaderRule(rule);
   }
   if (collection === "csp") return isCspRule(rule);
+  if (collection === "cookies" || collection === "setCookies") return isCookieRule(rule);
   return isNameValueRule(rule);
 }
 

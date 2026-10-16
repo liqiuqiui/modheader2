@@ -8,11 +8,19 @@ import {
   hasOnlyKeys,
   isAppendMode,
   isArrayOf,
+  isCookieWriteMode,
   isNonEmptyString,
   isNonNegativeInteger,
   isRecord,
 } from "./profile-guards";
-import type { CspRule, HeaderRule, NameValueRule, Profile, ProfileRules } from "./profile-model";
+import type {
+  CookieRule,
+  CspRule,
+  HeaderRule,
+  NameValueRule,
+  Profile,
+  ProfileRules,
+} from "./profile-model";
 import { profileEntityIds } from "./profile-operations";
 
 export function isHeaderRule(value: unknown): value is HeaderRule {
@@ -61,15 +69,36 @@ export function isNameValueRule(value: unknown): value is NameValueRule {
   );
 }
 
+export function isCookieRule(value: unknown): value is CookieRule {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["id", "enabled", "name", "value", "comment", "writeMode"]) &&
+    isNonEmptyString(value.id) &&
+    typeof value.enabled === "boolean" &&
+    typeof value.name === "string" &&
+    typeof value.value === "string" &&
+    typeof value.comment === "string" &&
+    isCookieWriteMode(value.writeMode)
+  );
+}
+
 export function isProfileRules(value: unknown): value is ProfileRules {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ["requestHeaders", "responseHeaders", "csp", "cookies", "redirects"]) &&
+    hasExactKeys(value, [
+      "requestHeaders",
+      "responseHeaders",
+      "csp",
+      "cookies",
+      "setCookies",
+      "redirects",
+    ]) &&
     isArrayOf(value.requestHeaders, isHeaderRule) &&
     isArrayOf(value.responseHeaders, isHeaderRule) &&
     value.responseHeaders.every((rule) => !isContentSecurityPolicyHeaderRule(rule)) &&
     isArrayOf(value.csp, isCspRule) &&
-    isArrayOf(value.cookies, isNameValueRule) &&
+    isArrayOf(value.cookies, isCookieRule) &&
+    isArrayOf(value.setCookies, isCookieRule) &&
     isArrayOf(value.redirects, isNameValueRule)
   );
 }
@@ -87,6 +116,7 @@ export function isProfile(value: unknown): value is Profile {
       "hideComment",
       "enabled",
       "paused",
+      "alwaysOn",
       "rules",
       "filters",
     ]) ||
@@ -99,6 +129,7 @@ export function isProfile(value: unknown): value is Profile {
     typeof value.hideComment !== "boolean" ||
     typeof value.enabled !== "boolean" ||
     typeof value.paused !== "boolean" ||
+    typeof value.alwaysOn !== "boolean" ||
     !isProfileRules(value.rules) ||
     !isArrayOf(value.filters, isProfileFilter)
   ) {

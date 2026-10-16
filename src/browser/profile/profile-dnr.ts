@@ -6,7 +6,10 @@ import {
   createContentSecurityPolicyValue,
 } from "../../types/profile/profile-csp";
 import { isNonNegativeInteger } from "../../types/profile/profile-guards";
+import { checkHeaderName } from "../../types/profile/profile-header-name";
+import type { ProfileDocument } from "../../types/profile/profile-document";
 import type {
+  CookieRule,
   CspRule,
   FilterKind,
   HeaderRule,
@@ -26,7 +29,7 @@ export interface ProfileDnrCompilation {
 }
 
 type DnrCondition = Browser.declarativeNetRequest.RuleCondition;
-type HeaderOperation = "append" | "set";
+type HeaderOperation = "append" | "set" | "remove";
 type PendingProfileDnrRule = Omit<ProfileDnrRule, "id" | "priority">;
 type UrlProfileFilter = Extract<ProfileFilter, { kind: "urlPattern" } | { kind: "urlRegex" }>;
 
@@ -66,19 +69,32 @@ function isDomain(value: string): boolean {
     );
 }
 
+/**
+ * `comma` is resolved to `append`: DNR has no comma-join operation, so the two
+ * are indistinguishable once the rule reaches the browser. The distinction is
+ * kept in the stored value only so older documents stay loadable.
+ */
 function appendModeToOperation(rule: HeaderRule): HeaderOperation {
+  if (rule.appendMode === "remove") return "remove";
   return rule.appendMode === "append" || rule.appendMode === "comma" ? "append" : "set";
 }
 
+/** `remove` carries no value, so it stays effective with an empty one. */
 function isEffectiveHeaderRule(rule: HeaderRule): boolean {
-  return Boolean(rule.enabled && rule.name.trim() && (rule.value || rule.sendEmptyHeader));
+  return Boolean(
+    rule.enabled && rule.name.trim() && (rule.value || rule.sendEmptyHeader || isRemoveRule(rule)),
+  );
+}
+
+function isRemoveRule(rule: HeaderRule): boolean {
+  return rule.appendMode === "remove";
 }
 
 function isEffectiveCspRule(rule: CspRule): boolean {
   return Boolean(rule.enabled && rule.directive.trim() && createCspDirectiveValue(rule));
 }
 
-function isEffectiveCookieRule(cookie: NameValueRule): boolean {
+function isEffectiveCookieRule(cookie: CookieRule): boolean {
   return Boolean(cookie.enabled && cookie.name.trim());
 }
 
@@ -94,6 +110,7 @@ export function countEnabledProfileModifications(profile?: Profile): number {
     profile.rules.responseHeaders.filter(isEffectiveHeaderRule).length +
     profile.rules.csp.filter(isEffectiveCspRule).length +
     profile.rules.cookies.filter(isEffectiveCookieRule).length +
+    profile.rules.setCookies.filter(isEffectiveCookieRule).length +
     profile.rules.redirects.filter(isEffectiveRedirectRule).length
   );
 }
@@ -362,15 +379,14 @@ function headerRuleToDnr(
   const name = rule.name.trim();
   if (!isEffectiveHeaderRule(rule)) return null;
 
+  const operation = appendModeToOperation(rule);
   return {
     action: {
       type: "modifyHeaders",
       [type]: [
-        {
-          header: name,
-          operation: appendModeToOperation(rule),
-          value: rule.value,
-        },
+        operation === "remove"
+          ? { header: name, operation }
+          : { header: name, operation, value: rule.value },
       ],
     },
     condition: withUrlCondition(condition, urlFilter),
@@ -405,7 +421,7 @@ function contentSecurityPolicyToDnr(
 const COOKIE_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 const COOKIE_VALUE_PATTERN = /^[!#$%&'()*+\-./:<=>?@[\]^_`{|}~0-9A-Za-z]*$/;
 
-function isSerializableCookieRule(cookie: NameValueRule): boolean {
+function isSerializableCookieRule(cookie: CookieRule): boolean {
   return (
     isEffectiveCookieRule(cookie) &&
     COOKIE_NAME_PATTERN.test(cookie.name.trim()) &&
@@ -413,24 +429,71 @@ function isSerializableCookieRule(cookie: NameValueRule): boolean {
   );
 }
 
+function serializeCookiePair(cookie: CookieRule): string {
+  return `${cookie.name.trim()}=${cookie.value.trim()}`;
+}
+
+/**
+ * `set` rules are merged into one `set` action; `append` rules become one
+ * `append` action per group so a single malformed pair cannot void the rest.
+ * The two operations cannot share a rule: DNR applies each header entry
+ * independently, so merging them would let the `set` value wipe appended pairs.
+ */
 function cookiesToDnr(
-  cookies: NameValueRule[],
+  cookies: CookieRule[],
   condition: DnrCondition,
   urlFilter?: UrlProfileFilter,
-): PendingProfileDnrRule | null {
-  const value = cookies
-    .filter(isSerializableCookieRule)
-    .map((cookie) => `${cookie.name.trim()}=${cookie.value.trim()}`)
-    .join("; ");
-  if (!value) return null;
+): PendingProfileDnrRule[] {
+  const serializable = cookies.filter(isSerializableCookieRule);
+  const rules: PendingProfileDnrRule[] = [];
 
-  return {
+  const setValue = serializable
+    .filter((cookie) => cookie.writeMode !== "append")
+    .map(serializeCookiePair)
+    .join("; ");
+  if (setValue) {
+    rules.push({
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [{ header: "cookie", operation: "set", value: setValue }],
+      },
+      condition: withUrlCondition(condition, urlFilter),
+    });
+  }
+
+  const appendValue = serializable
+    .filter((cookie) => cookie.writeMode === "append")
+    .map(serializeCookiePair)
+    .join("; ");
+  if (appendValue) {
+    rules.push({
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [{ header: "cookie", operation: "append", value: appendValue }],
+      },
+      condition: withUrlCondition(condition, urlFilter),
+    });
+  }
+
+  return rules;
+}
+
+/** `Set-Cookie` is a response header, and repeated pairs stay separate header
+ * lines rather than one comma-joined value. */
+function setCookiesToDnr(
+  cookies: CookieRule[],
+  condition: DnrCondition,
+  urlFilter?: UrlProfileFilter,
+): PendingProfileDnrRule[] {
+  return cookies.filter(isSerializableCookieRule).map((cookie) => ({
     action: {
       type: "modifyHeaders",
-      requestHeaders: [{ header: "cookie", operation: "set", value }],
+      responseHeaders: [
+        { header: "set-cookie", operation: "set", value: serializeCookiePair(cookie) },
+      ],
     },
     condition: withUrlCondition(condition, urlFilter),
-  };
+  }));
 }
 
 function urlReplacementToDnr(
@@ -458,6 +521,28 @@ function excludeUrlToDnr(filter: UrlProfileFilter, condition: DnrCondition): Pen
   };
 }
 
+/**
+ * A syntactically invalid or browser-owned header name is rejected by
+ * `updateSessionRules`, which surfaces as a background failure with no hint
+ * about the offending row. Checking it during compilation turns that into a
+ * diagnostic naming the header.
+ */
+function findHeaderNameProblem(profile: Profile): string | null {
+  const headerRules = [...profile.rules.requestHeaders, ...profile.rules.responseHeaders].filter(
+    isEffectiveHeaderRule,
+  );
+
+  for (const rule of headerRules) {
+    const check = checkHeaderName(rule.name);
+    if (check.ok) continue;
+    if (check.problem === "protected") {
+      return `Header "${rule.name.trim()}" is managed by the browser and cannot be modified`;
+    }
+    return `Header "${rule.name.trim()}" is not a valid header name`;
+  }
+  return null;
+}
+
 function rulePriority(rule: PendingProfileDnrRule, typeIndex: number): number {
   if (rule.action.type === "allow") return 10000 - typeIndex;
   if (rule.action.type === "redirect") return 5000 - typeIndex;
@@ -477,6 +562,22 @@ function finalizeRules(rules: PendingProfileDnrRule[]): ProfileDnrRule[] {
   });
 }
 
+/**
+ * Profiles that contribute rules: the selected one, plus every profile the user
+ * marked `alwaysOn`. Legacy ModHeader behaved the same way, so a shared
+ * baseline profile keeps applying while the user works in another one.
+ *
+ * A globally paused document produces nothing regardless of `alwaysOn`.
+ */
+export function activeProfiles(document: ProfileDocument): Profile[] {
+  if (document.isPaused) return [];
+  const { profiles, selectedProfileId } = document.state;
+  return profiles.filter(
+    (profile) =>
+      (profile.id === selectedProfileId || profile.alwaysOn) && profile.enabled && !profile.paused,
+  );
+}
+
 export function compileProfileDnrRules(
   profile?: Profile,
   options: ProfileDnrCompileOptions = {},
@@ -489,6 +590,9 @@ export function compileProfileDnrRules(
   if ("error" in conditionResult) return failedCompilation(conditionResult.error);
   const urlResult = compileUrlFilters(filters);
   if ("error" in urlResult) return failedCompilation(urlResult.error);
+
+  const headerProblem = findHeaderNameProblem(profile);
+  if (headerProblem) return failedCompilation(headerProblem);
 
   const enabledReplacements = profile.rules.redirects.filter(isEffectiveRedirectRule);
   if (
@@ -540,8 +644,10 @@ export function compileProfileDnrRules(
     if (candidate) actionRules.push(candidate);
   }
   for (const urlFilter of urlVariants) {
-    const candidate = cookiesToDnr(profile.rules.cookies, conditionResult.condition, urlFilter);
-    if (candidate) actionRules.push(candidate);
+    actionRules.push(
+      ...cookiesToDnr(profile.rules.cookies, conditionResult.condition, urlFilter),
+      ...setCookiesToDnr(profile.rules.setCookies, conditionResult.condition, urlFilter),
+    );
   }
   for (const replacement of enabledReplacements) {
     const candidate = urlReplacementToDnr(replacement, conditionResult.condition);
@@ -565,6 +671,42 @@ export function compileProfileDnrRules(
 
 export function profileToDnrRules(profile?: Profile): ProfileDnrRule[] {
   return compileProfileDnrRules(profile).rules;
+}
+
+/**
+ * Compiles every active profile into one rule set. Rule ids are re-based here
+ * rather than per profile, because two profiles would otherwise both start at
+ * `PROFILE_DNR_RULE_ID_BASE` and overwrite each other.
+ */
+export function compileActiveProfilesDnrRules(
+  document: ProfileDocument,
+  options: ProfileDnrCompileOptions = {},
+): ProfileDnrCompilation {
+  const profiles = activeProfiles(document);
+  if (profiles.length === 0) return { rules: [], diagnostics: [] };
+
+  const rules: ProfileDnrRule[] = [];
+  const diagnostics: string[] = [];
+
+  for (const profile of profiles) {
+    const compilation = compileProfileDnrRules(profile, options);
+    diagnostics.push(...compilation.diagnostics);
+    if (compilation.diagnostics.length > 0) continue;
+    rules.push(...compilation.rules);
+  }
+
+  if (diagnostics.length > 0) return failedCompilation(diagnostics.join("; "));
+  if (rules.length > MAX_PROFILE_DNR_RULES) {
+    return failedCompilation(
+      `Active profiles require ${rules.length} DNR rules, exceeding the ${MAX_PROFILE_DNR_RULES} rule limit`,
+    );
+  }
+
+  // Per-profile ids repeat across profiles, so they are re-issued densely here.
+  return {
+    rules: rules.map((rule, index) => ({ ...rule, id: PROFILE_DNR_RULE_ID_BASE + index })),
+    diagnostics: [],
+  };
 }
 
 async function unsupportedRegexDiagnostics(rules: ProfileDnrRule[]): Promise<string[]> {

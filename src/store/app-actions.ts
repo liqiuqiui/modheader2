@@ -180,6 +180,12 @@ export function createAppActions({
         : 0;
     },
     sortProfileRules: async (profileId) => commitCommand({ type: "sortProfileRules", profileId }),
+    sortProfilesByTitle: async () =>
+      commitCommand({ type: "sortProfilesByTitle" }, { recordHistory: false }),
+    setGlobalPaused: async (paused) =>
+      commitCommand({ type: "setGlobalPaused", paused }, { recordHistory: false }),
+    mergeProfile: async (targetProfileId, source) =>
+      commitCommand({ type: "mergeProfile", targetProfileId, source }),
     undo: async () => {
       await waitForPendingCommands(runtime);
       const state = get();

@@ -13,6 +13,7 @@ import {
   hasOnlyKeys,
   isArrayOf,
   isAppendMode,
+  isCookieWriteMode,
   isNonEmptyString,
   isNonNegativeInteger,
   isProfileRuleCollection,
@@ -20,6 +21,7 @@ import {
 } from "../../types/profile/profile-guards";
 import type { FilterKind, ProfileRuleCollection } from "../../types/profile/profile-model";
 import {
+  isCookieRule,
   isCspRule,
   isHeaderRule,
   isNameValueRule,
@@ -53,6 +55,7 @@ function isProfileMetadataPatch(value: unknown): boolean {
       "backgroundColor",
       "enabled",
       "paused",
+      "alwaysOn",
     ])
   ) {
     return false;
@@ -64,7 +67,8 @@ function isProfileMetadataPatch(value: unknown): boolean {
     (value.hideComment === undefined || typeof value.hideComment === "boolean") &&
     (value.backgroundColor === undefined || isProfileBackgroundColor(value.backgroundColor)) &&
     (value.enabled === undefined || typeof value.enabled === "boolean") &&
-    (value.paused === undefined || typeof value.paused === "boolean")
+    (value.paused === undefined || typeof value.paused === "boolean") &&
+    (value.alwaysOn === undefined || typeof value.alwaysOn === "boolean")
   );
 }
 
@@ -73,6 +77,7 @@ function isProfileRule(collection: ProfileRuleCollection, value: unknown): boole
     return isHeaderRule(value);
   }
   if (collection === "csp") return isCspRule(value);
+  if (collection === "cookies" || collection === "setCookies") return isCookieRule(value);
   return isNameValueRule(value);
 }
 
@@ -89,9 +94,12 @@ function isProfileRulePatch(collection: ProfileRuleCollection, value: unknown): 
   }
 
   const headerCollection = collection === "requestHeaders" || collection === "responseHeaders";
+  const cookieCollection = collection === "cookies" || collection === "setCookies";
   const allowedKeys = headerCollection
     ? ["enabled", "name", "value", "comment", "appendMode", "sendEmptyHeader"]
-    : ["enabled", "name", "value", "comment"];
+    : cookieCollection
+      ? ["enabled", "name", "value", "comment", "writeMode"]
+      : ["enabled", "name", "value", "comment"];
   if (!hasOnlyKeys(value, allowedKeys)) return false;
   return (
     (value.enabled === undefined || typeof value.enabled === "boolean") &&
@@ -99,6 +107,7 @@ function isProfileRulePatch(collection: ProfileRuleCollection, value: unknown): 
     (value.value === undefined || typeof value.value === "string") &&
     (value.comment === undefined || typeof value.comment === "string") &&
     (!headerCollection || value.appendMode === undefined || isAppendMode(value.appendMode)) &&
+    (!cookieCollection || value.writeMode === undefined || isCookieWriteMode(value.writeMode)) &&
     (!headerCollection ||
       value.sendEmptyHeader === undefined ||
       typeof value.sendEmptyHeader === "boolean")
@@ -129,6 +138,16 @@ function isProfileCommand(value: unknown): value is ProfileCommand {
     case "selectProfile":
     case "sortProfileRules":
       return hasOnlyKeys(value, ["type", "profileId"]) && isNonEmptyString(value.profileId);
+    case "sortProfilesByTitle":
+      return hasOnlyKeys(value, ["type"]);
+    case "setGlobalPaused":
+      return hasOnlyKeys(value, ["type", "paused"]) && typeof value.paused === "boolean";
+    case "mergeProfile":
+      return (
+        hasOnlyKeys(value, ["type", "targetProfileId", "source"]) &&
+        isNonEmptyString(value.targetProfileId) &&
+        isProfile(value.source)
+      );
     case "patchProfile":
       return (
         hasOnlyKeys(value, ["type", "profileId", "patch"]) &&

@@ -28,6 +28,8 @@ export type PatchProfileRuleCommand<K extends ProfileRuleCollection = ProfileRul
 export type ProfileCommand =
   | { type: "initialize"; profile: Profile }
   | { type: "selectProfile"; profileId: string }
+  /** Global kill switch: clears every compiled rule regardless of profile. */
+  | { type: "setGlobalPaused"; paused: boolean }
   | { type: "patchProfile"; profileId: string; patch: ProfileMetadataPatch }
   | {
       type: "reorderProfiles";
@@ -44,6 +46,8 @@ export type ProfileCommand =
     }
   | { type: "deleteProfile"; profileId: string; replacement: Profile }
   | { type: "importProfiles"; profiles: Profile[] }
+  /** Folds imported profiles into an existing one instead of appending them. */
+  | { type: "mergeProfile"; targetProfileId: string; source: Profile }
   | {
       [K in ProfileRuleCollection]: AddProfileRuleCommand<K>;
     }[ProfileRuleCollection]
@@ -108,6 +112,8 @@ export type ProfileCommand =
   | { type: "setFiltersEnabled"; profileId: string; enabled: boolean }
   | { type: "clearFilters"; profileId: string; expectedRevision: number }
   | { type: "sortProfileRules"; profileId: string }
+  /** Orders profiles by title; the sidebar default order is user-defined. */
+  | { type: "sortProfilesByTitle" }
   | { type: "replaceState"; state: ProfileState; expectedRevision: number };
 
 export function expectedProfileCommandRevision(command: ProfileCommand): number | undefined {

@@ -1,6 +1,15 @@
 /** Profile and persistence use one strict editor schema. */
 
-export type AppendMode = "override" | "append" | "comma";
+/**
+ * `remove` is expressed as an append mode rather than a separate operation
+ * field so the editor keeps one control per header row. It compiles to a DNR
+ * `remove` action, the only way to delete a header the site already sends.
+ *
+ * `comma` stays a valid stored value so documents written before it was
+ * dropped still load; the compiler resolves it to `append` because DNR has no
+ * comma-join operation, so it could never mean more than that.
+ */
+export type AppendMode = "override" | "append" | "comma" | "remove";
 
 export interface EntityIdentity {
   /** Local editor identity. */
@@ -32,6 +41,24 @@ export interface NameValueRule extends EntityIdentity {
   comment: string;
 }
 
+/**
+ * How a cookie reaches the request.
+ *
+ * - `set` replaces the whole `cookie` request header with the enabled pairs.
+ * - `append` adds the pairs to the header the site already sent, leaving
+ *   existing cookies intact. DNR expresses this as an `append` operation, so
+ *   several append rules are emitted as separate rules rather than merged.
+ */
+export type CookieWriteMode = "set" | "append";
+
+export interface CookieRule extends EntityIdentity {
+  enabled: boolean;
+  name: string;
+  value: string;
+  comment: string;
+  writeMode: CookieWriteMode;
+}
+
 export interface UrlReplacementRule extends EntityIdentity {
   enabled: boolean;
   name: string;
@@ -61,7 +88,12 @@ export const RESOURCE_TYPES = [
   "font",
   "object",
   "xmlhttprequest",
+  "ping",
+  "csp_report",
   "media",
+  "websocket",
+  "webtransport",
+  "webbundle",
   "other",
 ] as const;
 
@@ -128,7 +160,10 @@ export interface ProfileRules {
   requestHeaders: HeaderRule[];
   responseHeaders: HeaderRule[];
   csp: CspRule[];
-  cookies: NameValueRule[];
+  /** Written to the request `cookie` header. */
+  cookies: CookieRule[];
+  /** Written to the response `Set-Cookie` header. */
+  setCookies: CookieRule[];
   redirects: UrlReplacementRule[];
 }
 
@@ -137,13 +172,15 @@ export type ProfileRuleCollection =
   | "responseHeaders"
   | "csp"
   | "cookies"
+  | "setCookies"
   | "redirects";
 
 export interface ProfileRuleCollectionMap {
   requestHeaders: HeaderRule;
   responseHeaders: HeaderRule;
   csp: CspRule;
-  cookies: NameValueRule;
+  cookies: CookieRule;
+  setCookies: CookieRule;
   redirects: UrlReplacementRule;
 }
 
@@ -160,6 +197,8 @@ export interface Profile {
   filters: ProfileFilter[];
   enabled: boolean;
   paused: boolean;
+  /** Keeps this profile compiled even when another profile is selected. */
+  alwaysOn: boolean;
 }
 
 export type PersistedProfile = Profile;
@@ -170,18 +209,25 @@ export interface PersistedProfileState {
   isPaused: boolean;
 }
 
-export type ProfileRule = HeaderRule | CspRule | UrlReplacementRule | NameValueRule;
+export type ProfileRule = HeaderRule | CspRule | UrlReplacementRule | CookieRule;
 
 export type ProfileRulePatch<K extends ProfileRuleCollection = ProfileRuleCollection> =
   K extends "csp"
     ? Partial<Omit<CspRule, "id">>
     : K extends "requestHeaders" | "responseHeaders"
       ? Partial<Omit<HeaderRule, "id">>
-      : Partial<Omit<NameValueRule, "id">>;
+      : Partial<Omit<CookieRule, "id">>;
 
 export type ProfileMetadataPatch = Partial<
   Pick<
     Profile,
-    "title" | "shortTitle" | "backgroundColor" | "textColor" | "hideComment" | "enabled" | "paused"
+    | "title"
+    | "shortTitle"
+    | "backgroundColor"
+    | "textColor"
+    | "hideComment"
+    | "enabled"
+    | "paused"
+    | "alwaysOn"
   >
 >;

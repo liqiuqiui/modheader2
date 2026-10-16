@@ -7,6 +7,7 @@ import {
 } from "./profile-appearance";
 import { isNonEmptyString } from "./profile-guards";
 import type {
+  CookieRule,
   CspRule,
   HeaderRule,
   NameValueRule,
@@ -51,8 +52,16 @@ function createNameValueRule(overrides?: Partial<NameValueRule>): NameValueRule 
   };
 }
 
-export function createCookieRule(overrides?: Partial<NameValueRule>): NameValueRule {
-  return createNameValueRule(overrides);
+export function createCookieRule(overrides?: Partial<CookieRule>): CookieRule {
+  return {
+    id: nanoid(),
+    enabled: true,
+    name: "",
+    value: "",
+    comment: "",
+    writeMode: "set",
+    ...overrides,
+  };
 }
 
 export function createRedirectRule(overrides?: Partial<UrlReplacementRule>): UrlReplacementRule {
@@ -65,6 +74,7 @@ function createEditorRules(): ProfileRules {
     responseHeaders: [],
     csp: [],
     cookies: [],
+    setCookies: [],
     redirects: [],
   };
 }
@@ -101,5 +111,6 @@ export function createProfile({
     filters,
     enabled: true,
     paused: false,
+    alwaysOn: false,
   };
 }

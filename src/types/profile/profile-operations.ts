@@ -8,6 +8,7 @@ export function profileEntityIds(profile: Profile): string[] {
     ...profile.rules.responseHeaders.map((entity) => entity.id),
     ...profile.rules.csp.map((entity) => entity.id),
     ...profile.rules.cookies.map((entity) => entity.id),
+    ...profile.rules.setCookies.map((entity) => entity.id),
     ...profile.rules.redirects.map((entity) => entity.id),
     ...profile.filters.map((entity) => entity.id),
   ];
@@ -44,6 +45,9 @@ export function applyProfileMetadataPatch(profile: Profile, patch: unknown): Pro
   }
   if (typeof patch.paused === "boolean" && patch.paused !== profile.paused) {
     changes.paused = patch.paused;
+  }
+  if (typeof patch.alwaysOn === "boolean" && patch.alwaysOn !== profile.alwaysOn) {
+    changes.alwaysOn = patch.alwaysOn;
   }
   // Renaming without an explicit short title would otherwise leave the badge
   // showing the first character of a name that no longer exists.
