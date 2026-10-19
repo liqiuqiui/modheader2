@@ -11,7 +11,7 @@ export function exportProfileFile(profile: Profile): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${profile.title.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-|-$/g, "") || "profile"}.json`;
+  anchor.download = `${profile.title.trim() || "profile"}.json`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
